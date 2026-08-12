@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Reasignar {{ case.reference }} | Dirección de Auditoría{% endblock %}
+{% block content %}
+<nav class="breadcrumb" aria-label="Ruta"><a href="{% url 'director_dashboard' %}">Resumen ejecutivo</a><span>/</span><a href="{% url 'case_detail' case.pk %}">{{ case.reference }}</a><span>/</span><span>Reasignar</span></nav>
+<div class="page-heading"><p class="eyebrow">Decisión directiva</p><h1>Reasignar expediente</h1><p>Transfiera la responsabilidad del expediente a otro auditor y documente el fundamento.</p></div>
+<section class="assignment-current card"><span>Auditor responsable actual</span><strong>{{ previous_auditor.get_full_name|default:previous_auditor.username }}</strong><small>{{ case.reference }} · {{ case.audited_organization.name }}</small></section>
+<form method="post" class="editor-form card">
+    {% csrf_token %}
+    {% for field in form %}<div class="field {% if field.errors %}field-error{% endif %}">{{ field.label_tag }}{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}{{ field.errors }}</div>{% endfor %}
+    <div class="submit-panel"><p>El auditor anterior, el nuevo responsable y la justificación quedarán registrados.</p><div class="button-group"><a class="button button-ghost" href="{% url 'case_detail' case.pk %}">Cancelar</a><button class="button button-primary" type="submit">Confirmar reasignación</button></div></div>
+</form>
+{% endblock %}

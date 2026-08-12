@@ -5,12 +5,29 @@ from . import views
 
 urlpatterns = [
     path("", views.DashboardView.as_view(), name="dashboard"),
+    path("direccion/", views.DirectorDashboardView.as_view(), name="director_dashboard"),
+    path("direccion/decisiones/", views.director_decision_list, name="director_decisions"),
+    path(
+        "direccion/decisiones/<int:pk>/",
+        views.director_decision_detail,
+        name="director_decision_detail",
+    ),
+    path(
+        "direccion/expedientes/<int:pk>/reasignar/",
+        views.director_reassign_case,
+        name="director_reassign_case",
+    ),
     path("expedientes/", views.CaseListView.as_view(), name="case_list"),
     path("expedientes/nuevo/", views.case_create, name="case_create"),
     path("expedientes/<int:pk>/", views.case_detail, name="case_detail"),
     path("expedientes/<int:pk>/editar/", views.case_edit, name="case_edit"),
     path("expedientes/<int:pk>/contenido/", views.case_builder, name="case_builder"),
     path("expedientes/<int:pk>/publicar/", views.case_publish, name="case_publish"),
+    path(
+        "expedientes/<int:pk>/solicitar-cierre/",
+        views.request_case_closure,
+        name="request_case_closure",
+    ),
     path("expedientes/<int:pk>/informe/", views.download_report, name="download_report"),
     path("expedientes/<int:case_pk>/hallazgos/nuevo/", views.finding_create, name="finding_create"),
     path("hallazgos/<int:pk>/editar/", views.finding_edit, name="finding_edit"),

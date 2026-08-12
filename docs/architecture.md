@@ -27,11 +27,15 @@ El entorno local utiliza SQLite para simplificar el desarrollo. La configuració
 ### Expediente
 
 1. Borrador.
-2. Enviado.
-3. En respuesta.
-4. En revisión.
-5. Requiere corrección.
-6. Cerrado.
+2. Pendiente de aprobación directiva.
+3. Enviado.
+4. En respuesta.
+5. En revisión.
+6. Requiere corrección.
+7. Cierre solicitado.
+8. Cerrado.
+
+La publicación y el cierre requieren una decisión de la Dirección de Auditoría. El auditor asignado prepara y solicita; la directora aprueba o devuelve con una justificación inalterable. La reasignación de auditor también exige un fundamento y se registra en la bitácora.
 
 ### Recomendación
 
@@ -53,4 +57,3 @@ Los formatos iniciales permitidos son PDF, JPG, PNG, DOCX y XLSX. La validación
 - Servidor SMTP institucional.
 - Política definitiva de respaldo y retención.
 - Dominio, certificado y segmentación de red.
-

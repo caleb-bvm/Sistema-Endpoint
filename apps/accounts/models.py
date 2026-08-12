@@ -6,7 +6,7 @@ from django.db import models
 class User(AbstractUser):
     class Role(models.TextChoices):
         TECHNICAL_ADMIN = "technical_admin", "Administrador técnico"
-        AUDIT_MANAGER = "audit_manager", "Administrador de Auditoría"
+        AUDIT_MANAGER = "audit_manager", "Directora de Auditoría"
         AUDITOR = "auditor", "Auditor"
         INSTITUTION = "institution", "Responsable institucional"
 
@@ -40,4 +40,3 @@ class User(AbstractUser):
             raise ValidationError(
                 {"organization": "Los responsables institucionales deben pertenecer a una institución."}
             )
-

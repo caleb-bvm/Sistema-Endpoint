@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Publicar {{ case.reference }} | Auditoría Interna{% endblock %}
+{% block title %}Solicitar aprobación de {{ case.reference }} | Auditoría Interna{% endblock %}
 {% block content %}
 <nav class="breadcrumb" aria-label="Ruta"><a href="{% url 'case_list' %}">Expedientes</a><span>/</span><a href="{% url 'case_builder' case.pk %}">{{ case.reference }}</a><span>/</span><span>Publicar</span></nav>
 
@@ -11,8 +11,8 @@
 
 <div class="page-heading">
     <p class="eyebrow">Revisión final · {{ case.reference }}</p>
-    <h1>Publicar expediente</h1>
-    <p>Verifique la asignación y el contenido. Al publicar, las instituciones responsables podrán consultar las recomendaciones y presentar respuestas.</p>
+    <h1>Solicitar aprobación</h1>
+    <p>Verifique la asignación y el contenido. La Dirección de Auditoría revisará el expediente antes de que las instituciones responsables puedan consultarlo.</p>
 </div>
 
 {% if publication_issues %}
@@ -21,7 +21,7 @@
     <div><h2 id="requisitos-pendientes">Faltan requisitos para publicar</h2><ul>{% for issue in publication_issues %}<li>{{ issue }}</li>{% endfor %}</ul><a class="button button-secondary" href="{% url 'case_edit' case.pk %}">Completar datos generales</a></div>
 </section>
 {% else %}
-<section class="publication-check publication-check-ready"><div class="publication-check-icon" aria-hidden="true">✓</div><div><h2>Expediente listo para publicación</h2><p>Todos los requisitos básicos fueron completados.</p></div></section>
+<section class="publication-check publication-check-ready"><div class="publication-check-icon" aria-hidden="true">✓</div><div><h2>Expediente listo para aprobación</h2><p>Todos los requisitos básicos fueron completados.</p></div></section>
 {% endif %}
 
 <section class="publish-summary card">
@@ -40,7 +40,7 @@
 
 <form method="post" class="publish-action card">
     {% csrf_token %}
-    <div><strong>Confirmación de publicación</strong><p>Después de publicar, el contenido quedará disponible para respuesta y ya no podrá editarse como borrador.</p></div>
-    <div class="button-group"><a class="button button-ghost" href="{% url 'case_builder' case.pk %}">Volver al contenido</a><button class="button button-primary button-large" type="submit" {% if publication_issues %}disabled{% endif %}>Publicar expediente</button></div>
+    <div><strong>Envío a la Dirección de Auditoría</strong><p>Mientras la solicitud esté pendiente no podrá editar el borrador. Si se devuelve, recibirá las observaciones y podrá corregirlo.</p></div>
+    <div class="button-group"><a class="button button-ghost" href="{% url 'case_builder' case.pk %}">Volver al contenido</a><button class="button button-primary button-large" type="submit" {% if publication_issues %}disabled{% endif %}>Enviar para aprobación</button></div>
 </form>
 {% endblock %}

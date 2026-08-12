@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from django import forms
+from django.db import models
 
 from apps.accounts.models import User
 from apps.institutions.models import Organization
@@ -108,6 +109,51 @@ class RecommendationForm(forms.ModelForm):
         self.fields["responsible_organization"].queryset = Organization.objects.filter(
             is_active=True
         ).order_by("name")
+
+
+class DecisionResolutionForm(forms.Form):
+    class Action(models.TextChoices):
+        APPROVE = "approve", "Aprobar"
+        RETURN = "return", "Devolver"
+
+    action = forms.ChoiceField(label="Decisión", choices=Action.choices)
+    justification = forms.CharField(
+        label="Justificación",
+        min_length=10,
+        widget=forms.Textarea(attrs={"rows": 5}),
+        help_text="Explique el fundamento de la decisión. Quedará incorporado a la bitácora.",
+    )
+
+
+class ClosureRequestForm(forms.Form):
+    justification = forms.CharField(
+        label="Fundamento de la solicitud de cierre",
+        min_length=10,
+        widget=forms.Textarea(attrs={"rows": 5}),
+        help_text="Resuma por qué el expediente reúne las condiciones para su cierre.",
+    )
+
+
+class AuditorReassignmentForm(forms.Form):
+    assigned_auditor = forms.ModelChoiceField(
+        label="Nuevo auditor responsable",
+        queryset=User.objects.none(),
+    )
+    justification = forms.CharField(
+        label="Justificación de la reasignación",
+        min_length=10,
+        widget=forms.Textarea(attrs={"rows": 4}),
+        help_text="La reasignación y su fundamento quedarán registrados.",
+    )
+
+    def __init__(self, *args, current_auditor=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        queryset = User.objects.filter(is_active=True, role=User.Role.AUDITOR)
+        if current_auditor:
+            queryset = queryset.exclude(pk=current_auditor.pk)
+        self.fields["assigned_auditor"].queryset = queryset.order_by(
+            "first_name", "last_name", "username"
+        )
 
 
 class MultipleFileInput(forms.ClearableFileInput):

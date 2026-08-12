@@ -6,7 +6,7 @@
         <p class="eyebrow">Sistema de seguimiento</p>
         <h1>Panel general</h1>
         <p>{% if user.is_audit_staff %}Consulte el estado general de los expedientes y gestione las respuestas pendientes de revisión.{% else %}Consulte los expedientes asignados y dé seguimiento a las recomendaciones pendientes de su institución.{% endif %}</p>
-        <div class="button-group"><a class="button button-primary" href="{% url 'case_list' %}">Consultar expedientes <span aria-hidden="true">→</span></a>{% if user.is_superuser or user.role == 'audit_manager' or user.role == 'auditor' %}<a class="button button-secondary" href="{% url 'case_create' %}">Nuevo expediente</a>{% endif %}</div>
+        <div class="button-group"><a class="button button-primary" href="{% url 'case_list' %}">Consultar expedientes <span aria-hidden="true">→</span></a>{% if user.role == 'auditor' %}<a class="button button-secondary" href="{% url 'case_create' %}">Nuevo expediente</a>{% endif %}</div>
     </div>
     <div class="welcome-visual" aria-hidden="true">
         <span class="visual-ring"></span>

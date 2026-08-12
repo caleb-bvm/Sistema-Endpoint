@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-heading heading-row">
     <div><p class="eyebrow">Gestión de auditoría</p><h1>Expedientes</h1><p>Consulte los informes de auditoría, las recomendaciones emitidas, las respuestas institucionales y los resultados de revisión.</p></div>
-    {% if user.is_superuser or user.role == 'audit_manager' or user.role == 'auditor' %}<a class="button button-primary" href="{% url 'case_create' %}">+ Nuevo expediente</a>{% endif %}
+    {% if user.role == 'auditor' %}<a class="button button-primary" href="{% url 'case_create' %}">+ Nuevo expediente</a>{% endif %}
 </div>
 <form method="get" class="filter-bar" role="search">
     <div class="field grow search-field"><label for="q">Criterio de búsqueda</label><div class="input-with-icon"><span aria-hidden="true">⌕</span><input id="q" name="q" value="{{ request.GET.q }}" placeholder="Ingrese referencia, institución o código"></div></div>

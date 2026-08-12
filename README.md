@@ -13,6 +13,7 @@ Primera base funcional para registrar expedientes, hallazgos, recomendaciones, r
 - Bitácora de envíos, revisiones y descargas.
 - Panel administrativo y panel web para instituciones.
 - Flujo propio para crear borradores, registrar hallazgos y recomendaciones, revisar y publicar expedientes.
+- Perfil de Dirección de Auditoría con resumen ejecutivo, bandeja de decisiones, aprobación de publicaciones y cierres, y reasignación justificada de auditores.
 - Importación validada del catálogo institucional desde CSV.
 
 ## Inicio local en Windows

@@ -19,10 +19,12 @@ def private_upload_path(instance, filename):
 class AuditCase(models.Model):
     class Status(models.TextChoices):
         DRAFT = "draft", "Borrador"
+        PENDING_PUBLICATION = "pending_publication", "Pendiente de aprobación"
         PUBLISHED = "published", "Enviado"
         IN_RESPONSE = "in_response", "En respuesta"
         UNDER_REVIEW = "under_review", "En revisión"
         CORRECTION_REQUIRED = "correction_required", "Requiere corrección"
+        PENDING_CLOSURE = "pending_closure", "Cierre solicitado"
         CLOSED = "closed", "Cerrado"
 
     reference = models.CharField("referencia", max_length=60, unique=True)
@@ -276,3 +278,58 @@ class ActivityLog(models.Model):
     def __str__(self):
         return f"{self.created_at:%Y-%m-%d %H:%M} - {self.action}"
 
+
+class CaseDecision(models.Model):
+    class Kind(models.TextChoices):
+        PUBLICATION = "publication", "Publicación"
+        CLOSURE = "closure", "Cierre"
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pendiente"
+        APPROVED = "approved", "Aprobada"
+        RETURNED = "returned", "Devuelta"
+
+    case = models.ForeignKey(
+        AuditCase,
+        verbose_name="expediente",
+        on_delete=models.PROTECT,
+        related_name="decisions",
+    )
+    kind = models.CharField("tipo de decisión", max_length=20, choices=Kind.choices)
+    status = models.CharField(
+        "estado", max_length=20, choices=Status.choices, default=Status.PENDING
+    )
+    request_note = models.TextField("nota de solicitud", blank=True)
+    previous_case_status = models.CharField("estado anterior", max_length=30, blank=True)
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="solicitada por",
+        on_delete=models.PROTECT,
+        related_name="requested_case_decisions",
+    )
+    requested_at = models.DateTimeField("solicitada", auto_now_add=True)
+    decision_note = models.TextField("justificación de la decisión", blank=True)
+    decided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="decidida por",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="decided_case_decisions",
+    )
+    decided_at = models.DateTimeField("decidida", null=True, blank=True)
+
+    class Meta:
+        verbose_name = "decisión directiva"
+        verbose_name_plural = "decisiones directivas"
+        ordering = ("-requested_at",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=("case",),
+                condition=models.Q(status="pending"),
+                name="one_pending_decision_per_case",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.case.reference} - {self.get_kind_display()} - {self.get_status_display()}"

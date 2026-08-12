@@ -14,7 +14,16 @@ from apps.accounts.models import User
 from apps.core.validators import validate_evidence_file
 from apps.institutions.models import Organization
 
-from .models import ActivityLog, AuditCase, Evidence, Finding, Recommendation, Response, Review
+from .models import (
+    ActivityLog,
+    AuditCase,
+    CaseDecision,
+    Evidence,
+    Finding,
+    Recommendation,
+    Response,
+    Review,
+)
 
 
 TEST_MEDIA_ROOT = tempfile.mkdtemp(prefix="auditoria-test-")
@@ -24,7 +33,9 @@ class SeedDemoCommandTests(TestCase):
     def test_running_seed_again_preserves_existing_passwords(self):
         call_command("seed_demo", stdout=StringIO())
         original_passwords = dict(
-            User.objects.filter(username__in=["auditor.demo", "centro.10754"])
+            User.objects.filter(
+                username__in=["auditor.demo", "directora.demo", "centro.10754"]
+            )
             .values_list("username", "password")
         )
 
@@ -32,7 +43,9 @@ class SeedDemoCommandTests(TestCase):
         call_command("seed_demo", stdout=output)
 
         current_passwords = dict(
-            User.objects.filter(username__in=["auditor.demo", "centro.10754"])
+            User.objects.filter(
+                username__in=["auditor.demo", "directora.demo", "centro.10754"]
+            )
             .values_list("username", "password")
         )
         self.assertEqual(current_passwords, original_passwords)
@@ -41,7 +54,9 @@ class SeedDemoCommandTests(TestCase):
     def test_passwords_can_be_reset_explicitly(self):
         call_command("seed_demo", stdout=StringIO())
         original_passwords = dict(
-            User.objects.filter(username__in=["auditor.demo", "centro.10754"])
+            User.objects.filter(
+                username__in=["auditor.demo", "directora.demo", "centro.10754"]
+            )
             .values_list("username", "password")
         )
 
@@ -49,11 +64,14 @@ class SeedDemoCommandTests(TestCase):
         call_command("seed_demo", reset_passwords=True, stdout=output)
 
         current_passwords = dict(
-            User.objects.filter(username__in=["auditor.demo", "centro.10754"])
+            User.objects.filter(
+                username__in=["auditor.demo", "directora.demo", "centro.10754"]
+            )
             .values_list("username", "password")
         )
         self.assertNotEqual(current_passwords, original_passwords)
         self.assertIn("Auditoría: auditor.demo /", output.getvalue())
+        self.assertIn("Dirección: directora.demo /", output.getvalue())
 
 
 @override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT, FILE_SCAN_REQUIRED=False)
@@ -77,6 +95,20 @@ class AccessAndWorkflowTests(TestCase):
             username="auditor",
             password="UnaClaveDePrueba!2026",
             role=User.Role.AUDITOR,
+            organization=self.audit_unit,
+            must_change_password=False,
+        )
+        self.director = User.objects.create_user(
+            username="directora",
+            password="UnaClaveDePrueba!2026",
+            role=User.Role.AUDIT_MANAGER,
+            organization=self.audit_unit,
+            must_change_password=False,
+        )
+        self.technical_admin = User.objects.create_user(
+            username="tecnico",
+            password="UnaClaveDePrueba!2026",
+            role=User.Role.TECHNICAL_ADMIN,
             organization=self.audit_unit,
             must_change_password=False,
         )
@@ -212,7 +244,7 @@ class AccessAndWorkflowTests(TestCase):
         content = b"".join(result.streaming_content)
         self.assertTrue(content.startswith(b"%PDF-"))
 
-    def test_auditor_can_create_build_and_publish_a_case(self):
+    def test_auditor_can_build_and_director_can_approve_publication(self):
         self.client.force_login(self.auditor)
         create_response = self.client.post(
             reverse("case_create"),
@@ -266,10 +298,32 @@ class AccessAndWorkflowTests(TestCase):
         publish_response = self.client.post(reverse("case_publish", args=[created_case.pk]))
         self.assertRedirects(publish_response, reverse("case_detail", args=[created_case.pk]))
         created_case.refresh_from_db()
-        self.assertEqual(created_case.status, AuditCase.Status.PUBLISHED)
+        self.assertEqual(created_case.status, AuditCase.Status.PENDING_PUBLICATION)
+        decision = CaseDecision.objects.get(case=created_case, kind=CaseDecision.Kind.PUBLICATION)
         self.assertTrue(
-            ActivityLog.objects.filter(case=created_case, action="case_published").exists()
+            ActivityLog.objects.filter(
+                case=created_case, action="case_publication_requested"
+            ).exists()
         )
+
+        self.client.force_login(self.institution_user)
+        hidden_response = self.client.get(reverse("case_detail", args=[created_case.pk]))
+        self.assertEqual(hidden_response.status_code, 404)
+
+        self.client.force_login(self.director)
+        approval_response = self.client.post(
+            reverse("director_decision_detail", args=[decision.pk]),
+            {
+                "action": "approve",
+                "justification": "El expediente reúne los requisitos técnicos para su publicación.",
+            },
+        )
+        self.assertRedirects(approval_response, reverse("director_decisions"))
+        created_case.refresh_from_db()
+        decision.refresh_from_db()
+        self.assertEqual(created_case.status, AuditCase.Status.PUBLISHED)
+        self.assertEqual(decision.status, CaseDecision.Status.APPROVED)
+        self.assertEqual(decision.decided_by, self.director)
 
         self.client.force_login(self.institution_user)
         visible_response = self.client.get(reverse("case_detail", args=[created_case.pk]))
@@ -351,3 +405,190 @@ class AccessAndWorkflowTests(TestCase):
         self.client.force_login(other_auditor)
         result = self.client.get(reverse("case_builder", args=[draft_case.pk]))
         self.assertEqual(result.status_code, 403)
+
+    def test_director_dashboard_is_restricted_to_director(self):
+        self.client.force_login(self.director)
+        result = self.client.get(reverse("director_dashboard"))
+        self.assertEqual(result.status_code, 200)
+        self.assertContains(result, "Resumen ejecutivo")
+
+        self.client.force_login(self.auditor)
+        forbidden = self.client.get(reverse("director_dashboard"))
+        self.assertEqual(forbidden.status_code, 403)
+
+        self.client.force_login(self.technical_admin)
+        forbidden = self.client.get(reverse("director_dashboard"))
+        self.assertEqual(forbidden.status_code, 403)
+
+    def test_director_can_return_publication_with_justification(self):
+        draft_case = AuditCase.objects.create(
+            reference="IA-RETURN-001",
+            title="Borrador para devolución",
+            audited_organization=self.center,
+            report_file=SimpleUploadedFile(
+                "informe.pdf", b"%PDF-1.4\ncontenido", content_type="application/pdf"
+            ),
+            report_date=date.today(),
+            response_deadline=date.today(),
+            status=AuditCase.Status.PENDING_PUBLICATION,
+            assigned_auditor=self.auditor,
+            created_by=self.auditor,
+        )
+        decision = CaseDecision.objects.create(
+            case=draft_case,
+            kind=CaseDecision.Kind.PUBLICATION,
+            requested_by=self.auditor,
+            previous_case_status=AuditCase.Status.DRAFT,
+        )
+        self.client.force_login(self.director)
+        result = self.client.post(
+            reverse("director_decision_detail", args=[decision.pk]),
+            {
+                "action": "return",
+                "justification": "Debe corregirse la identificación oficial del informe presentado.",
+            },
+        )
+        self.assertRedirects(result, reverse("director_decisions"))
+        draft_case.refresh_from_db()
+        decision.refresh_from_db()
+        self.assertEqual(draft_case.status, AuditCase.Status.DRAFT)
+        self.assertEqual(decision.status, CaseDecision.Status.RETURNED)
+        self.assertTrue(
+            ActivityLog.objects.filter(
+                case=draft_case, action="case_publication_returned"
+            ).exists()
+        )
+
+    def test_director_decision_requires_justification(self):
+        self.case.status = AuditCase.Status.PENDING_PUBLICATION
+        self.case.save(update_fields=["status"])
+        decision = CaseDecision.objects.create(
+            case=self.case,
+            kind=CaseDecision.Kind.PUBLICATION,
+            requested_by=self.auditor,
+            previous_case_status=AuditCase.Status.DRAFT,
+        )
+        self.client.force_login(self.director)
+        result = self.client.post(
+            reverse("director_decision_detail", args=[decision.pk]),
+            {"action": "approve", "justification": "corto"},
+        )
+        self.assertEqual(result.status_code, 200)
+        decision.refresh_from_db()
+        self.case.refresh_from_db()
+        self.assertEqual(decision.status, CaseDecision.Status.PENDING)
+        self.assertEqual(self.case.status, AuditCase.Status.PENDING_PUBLICATION)
+
+    def test_auditor_and_technical_admin_cannot_resolve_director_decision(self):
+        self.case.status = AuditCase.Status.PENDING_PUBLICATION
+        self.case.save(update_fields=["status"])
+        decision = CaseDecision.objects.create(
+            case=self.case,
+            kind=CaseDecision.Kind.PUBLICATION,
+            requested_by=self.auditor,
+            previous_case_status=AuditCase.Status.DRAFT,
+        )
+        payload = {
+            "action": "approve",
+            "justification": "Intento de aprobación sin autoridad directiva suficiente.",
+        }
+        self.client.force_login(self.auditor)
+        auditor_result = self.client.post(
+            reverse("director_decision_detail", args=[decision.pk]), payload
+        )
+        self.assertEqual(auditor_result.status_code, 403)
+
+        self.client.force_login(self.technical_admin)
+        technical_result = self.client.post(
+            reverse("director_decision_detail", args=[decision.pk]), payload
+        )
+        self.assertEqual(technical_result.status_code, 403)
+        decision.refresh_from_db()
+        self.assertEqual(decision.status, CaseDecision.Status.PENDING)
+
+    def test_director_can_approve_case_closure(self):
+        self.recommendation.status = Recommendation.Status.COMPLIED
+        self.recommendation.save(update_fields=["status"])
+        self.case.status = AuditCase.Status.UNDER_REVIEW
+        self.case.save(update_fields=["status"])
+
+        self.client.force_login(self.auditor)
+        request_result = self.client.post(
+            reverse("request_case_closure", args=[self.case.pk]),
+            {
+                "justification": (
+                    "Todas las recomendaciones cuentan con un resultado definitivo documentado."
+                )
+            },
+        )
+        self.assertRedirects(request_result, reverse("case_detail", args=[self.case.pk]))
+        self.case.refresh_from_db()
+        self.assertEqual(self.case.status, AuditCase.Status.PENDING_CLOSURE)
+        decision = CaseDecision.objects.get(case=self.case, kind=CaseDecision.Kind.CLOSURE)
+
+        self.client.force_login(self.director)
+        approval_result = self.client.post(
+            reverse("director_decision_detail", args=[decision.pk]),
+            {
+                "action": "approve",
+                "justification": "Se verificó el resultado final y la trazabilidad del expediente.",
+            },
+        )
+        self.assertRedirects(approval_result, reverse("director_decisions"))
+        self.case.refresh_from_db()
+        self.assertEqual(self.case.status, AuditCase.Status.CLOSED)
+
+    def test_closure_request_is_blocked_with_open_recommendations(self):
+        self.client.force_login(self.auditor)
+        result = self.client.post(
+            reverse("request_case_closure", args=[self.case.pk]),
+            {
+                "justification": (
+                    "Se solicita el cierre aunque todavía existe trabajo pendiente de revisión."
+                )
+            },
+        )
+        self.assertEqual(result.status_code, 200)
+        self.case.refresh_from_db()
+        self.assertEqual(self.case.status, AuditCase.Status.PUBLISHED)
+        self.assertFalse(
+            CaseDecision.objects.filter(case=self.case, kind=CaseDecision.Kind.CLOSURE).exists()
+        )
+
+    def test_director_can_reassign_case_with_audit_log(self):
+        replacement = User.objects.create_user(
+            username="auditor-reemplazo",
+            password="UnaClaveDePrueba!2026",
+            role=User.Role.AUDITOR,
+            organization=self.audit_unit,
+            must_change_password=False,
+        )
+        self.client.force_login(self.director)
+        result = self.client.post(
+            reverse("director_reassign_case", args=[self.case.pk]),
+            {
+                "assigned_auditor": replacement.pk,
+                "justification": "Se redistribuye la carga por disponibilidad operativa del equipo.",
+            },
+        )
+        self.assertRedirects(result, reverse("case_detail", args=[self.case.pk]))
+        self.case.refresh_from_db()
+        self.assertEqual(self.case.assigned_auditor, replacement)
+        log = ActivityLog.objects.get(case=self.case, action="case_reassigned")
+        self.assertEqual(log.details["previous_auditor_id"], self.auditor.pk)
+        self.assertEqual(log.details["new_auditor_id"], replacement.pk)
+
+    def test_director_cannot_create_case_or_edit_auditor_draft(self):
+        draft_case = AuditCase.objects.create(
+            reference="IA-DIRECTOR-DRAFT",
+            title="Borrador del auditor",
+            audited_organization=self.center,
+            status=AuditCase.Status.DRAFT,
+            assigned_auditor=self.auditor,
+            created_by=self.auditor,
+        )
+        self.client.force_login(self.director)
+        create_result = self.client.get(reverse("case_create"))
+        edit_result = self.client.get(reverse("case_builder", args=[draft_case.pk]))
+        self.assertEqual(create_result.status_code, 403)
+        self.assertEqual(edit_result.status_code, 403)

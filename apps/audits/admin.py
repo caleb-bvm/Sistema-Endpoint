@@ -1,6 +1,15 @@
 from django.contrib import admin
 
-from .models import ActivityLog, AuditCase, Evidence, Finding, Recommendation, Response, Review
+from .models import (
+    ActivityLog,
+    AuditCase,
+    CaseDecision,
+    Evidence,
+    Finding,
+    Recommendation,
+    Response,
+    Review,
+)
 
 
 class RecommendationInline(admin.StackedInline):
@@ -78,3 +87,30 @@ class ActivityLogAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         return False
 
+
+@admin.register(CaseDecision)
+class CaseDecisionAdmin(admin.ModelAdmin):
+    list_display = ("requested_at", "case", "kind", "status", "requested_by", "decided_by")
+    list_filter = ("kind", "status", "requested_at")
+    search_fields = ("case__reference", "case__audited_organization__name", "decision_note")
+    readonly_fields = (
+        "case",
+        "kind",
+        "status",
+        "request_note",
+        "previous_case_status",
+        "requested_by",
+        "requested_at",
+        "decision_note",
+        "decided_by",
+        "decided_at",
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

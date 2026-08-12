@@ -62,6 +62,20 @@ class Command(BaseCommand):
             },
         )
 
+        director, director_created = User.objects.update_or_create(
+            username="directora.demo",
+            defaults={
+                "first_name": "Directora",
+                "last_name": "de Auditoría",
+                "email": "directora.demo@localhost",
+                "role": User.Role.AUDIT_MANAGER,
+                "organization": audit_unit,
+                "job_title": "Directora de Auditoría Interna",
+                "is_staff": False,
+                "must_change_password": False,
+            },
+        )
+
         institutional, institutional_created = User.objects.update_or_create(
             username="centro.10754",
             defaults={
@@ -78,6 +92,8 @@ class Command(BaseCommand):
         users_requiring_password = []
         if auditor_created or reset_passwords:
             users_requiring_password.append(auditor)
+        if director_created or reset_passwords:
+            users_requiring_password.append(director)
         if institutional_created or reset_passwords:
             users_requiring_password.append(institutional)
 
@@ -174,6 +190,10 @@ class Command(BaseCommand):
             self.stdout.write(f"Auditoría: auditor.demo / {password}")
         else:
             self.stdout.write("Auditoría: se conservó la contraseña existente de auditor.demo.")
+        if director_created or reset_passwords:
+            self.stdout.write(f"Dirección: directora.demo / {password}")
+        else:
+            self.stdout.write("Dirección: se conservó la contraseña existente de directora.demo.")
         if institutional_created or reset_passwords:
             self.stdout.write(f"Centro educativo: centro.10754 / {password}")
         else:
