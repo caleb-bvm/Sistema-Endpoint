@@ -7,7 +7,7 @@
     <meta name="description" content="Sistema institucional de seguimiento de recomendaciones de Auditoría Interna">
     <title>{% block title %}Sistema de Seguimiento de Auditoría Interna{% endblock %}</title>
     <meta name="theme-color" content="#0b4a7d">
-    <link rel="stylesheet" href="{% static 'css/app.css' %}?v=20260812-2">
+    <link rel="stylesheet" href="{% static 'css/app.css' %}?v=20260812-3">
 </head>
 <body>
     <a class="skip-link" href="#contenido">Saltar al contenido</a>
@@ -38,7 +38,12 @@
             <a href="{% url 'case_list' %}" class="nav-item {% if request.resolver_match.url_name == 'case_list' or request.resolver_match.url_name == 'case_detail' or request.resolver_match.url_name == 'respond_recommendation' or request.resolver_match.url_name == 'review_response' %}is-active{% endif %}" {% if request.resolver_match.url_name == 'case_list' or request.resolver_match.url_name == 'case_detail' or request.resolver_match.url_name == 'respond_recommendation' or request.resolver_match.url_name == 'review_response' %}aria-current="page"{% endif %}>
                 <span class="nav-icon" aria-hidden="true">▤</span><span>Expedientes</span>
             </a>
-            {% if user.is_audit_staff %}
+            {% if user.is_superuser or user.role == 'audit_manager' or user.role == 'auditor' %}
+            <a href="{% url 'case_create' %}" class="nav-item {% if request.resolver_match.url_name == 'case_create' or request.resolver_match.url_name == 'case_edit' or request.resolver_match.url_name == 'case_builder' or request.resolver_match.url_name == 'case_publish' or request.resolver_match.url_name == 'finding_create' or request.resolver_match.url_name == 'finding_edit' or request.resolver_match.url_name == 'recommendation_create' or request.resolver_match.url_name == 'recommendation_edit' %}is-active{% endif %}">
+                <span class="nav-icon" aria-hidden="true">＋</span><span>Preparar expediente</span>
+            </a>
+            {% endif %}
+            {% if user.is_superuser or user.role == 'technical_admin' or user.role == 'audit_manager' %}
             <a href="/administracion/" class="nav-item">
                 <span class="nav-icon" aria-hidden="true">⚙</span><span>Administración</span>
             </a>

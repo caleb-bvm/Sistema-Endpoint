@@ -4,7 +4,7 @@
 <nav class="breadcrumb" aria-label="Ruta"><a href="{% url 'case_list' %}">Expedientes</a><span>/</span><span>{{ case.reference }}</span></nav>
 <div class="page-heading heading-row">
     <div><p class="eyebrow">{{ case.reference }}</p><h1>{{ case.audited_organization.name }}</h1><p>{{ case.title }}</p></div>
-    <span class="status status-large status-{{ case.status }}">{{ case.get_status_display }}</span>
+    <div class="heading-actions"><span class="status status-large status-{{ case.status }}">{{ case.get_status_display }}</span>{% if can_edit_case %}<a class="button button-primary" href="{% url 'case_builder' case.pk %}">Continuar borrador</a>{% endif %}</div>
 </div>
 <section class="case-summary card">
     <dl class="summary-grid">
@@ -14,6 +14,7 @@
         <div><dt>Fecha límite</dt><dd>{{ case.response_deadline|date:"d/m/Y"|default:"Por definir" }}</dd></div>
     </dl>
 </section>
+{% if case.report_file %}<div class="document-bar"><div><span aria-hidden="true">PDF</span><div><strong>Informe de auditoría</strong><small>Documento oficial asociado al expediente</small></div></div><a class="button button-secondary" href="{% url 'download_report' case.pk %}">Descargar informe</a></div>{% endif %}
 
 <section class="section-block">
     <div class="section-heading"><div><p class="eyebrow">Contenido del informe</p><h2>Hallazgos y recomendaciones</h2></div></div>

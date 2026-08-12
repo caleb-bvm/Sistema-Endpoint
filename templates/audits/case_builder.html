@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Contenido de {{ case.reference }} | Auditoría Interna{% endblock %}
+{% block content %}
+<nav class="breadcrumb" aria-label="Ruta"><a href="{% url 'case_list' %}">Expedientes</a><span>/</span><span>{{ case.reference }}</span></nav>
+
+<ol class="workflow-steps" aria-label="Progreso del expediente">
+    <li class="is-complete"><span>✓</span><div><strong>Datos generales</strong><small>Informe y asignación</small></div></li>
+    <li class="is-active"><span>2</span><div><strong>Contenido</strong><small>Hallazgos y recomendaciones</small></div></li>
+    <li><span>3</span><div><strong>Publicación</strong><small>Revisión final</small></div></li>
+</ol>
+
+<div class="page-heading heading-row">
+    <div><p class="eyebrow">Expediente en borrador · {{ case.reference }}</p><h1>Hallazgos y recomendaciones</h1><p>{{ case.audited_organization.name }} · {{ case.title }}</p></div>
+    <div class="button-group"><a class="button button-secondary" href="{% url 'case_edit' case.pk %}">Editar datos generales</a><a class="button button-primary" href="{% url 'finding_create' case.pk %}">Agregar hallazgo</a></div>
+</div>
+
+<div class="draft-notice"><span aria-hidden="true">i</span><div><strong>Este expediente aún no es visible para las instituciones.</strong><p>Puede editar o eliminar su contenido libremente antes de publicarlo.</p></div></div>
+
+<section class="builder-list">
+    {% for finding in findings %}
+    <article class="builder-finding card">
+        <header>
+            <div><span class="finding-number">Hallazgo {{ finding.number }}</span><h2>{{ finding.title }}</h2></div>
+            <span class="risk risk-{{ finding.risk_level }}">Riesgo {{ finding.get_risk_level_display }}</span>
+        </header>
+        <div class="item-actions">
+            <a class="button button-tonal button-compact" href="{% url 'finding_edit' finding.pk %}">Editar hallazgo</a>
+            <form method="post" action="{% url 'finding_delete' finding.pk %}" onsubmit="return confirm('¿Eliminar este hallazgo y todas sus recomendaciones?');">{% csrf_token %}<button class="button button-danger button-compact" type="submit">Eliminar</button></form>
+        </div>
+        <div class="builder-recommendations">
+            {% for recommendation in finding.recommendations.all %}
+            <div class="builder-recommendation">
+                <div class="builder-recommendation-copy"><span class="recommendation-number">Recomendación {{ finding.number }}.{{ recommendation.number }}</span><p>{{ recommendation.text|truncatechars:260 }}</p><small>{{ recommendation.responsible_organization.name }} · Límite: {{ recommendation.deadline|date:"d/m/Y"|default:"Sin definir" }}</small></div>
+                <div class="item-actions">
+                    <a class="button button-ghost button-compact" href="{% url 'recommendation_edit' recommendation.pk %}">Editar</a>
+                    <form method="post" action="{% url 'recommendation_delete' recommendation.pk %}" onsubmit="return confirm('¿Eliminar esta recomendación?');">{% csrf_token %}<button class="button button-danger-link button-compact" type="submit">Eliminar</button></form>
+                </div>
+            </div>
+            {% empty %}<div class="inline-empty"><p>Este hallazgo todavía no tiene recomendaciones.</p></div>{% endfor %}
+            <a class="button button-secondary" href="{% url 'recommendation_create' finding.pk %}">+ Agregar recomendación</a>
+        </div>
+    </article>
+    {% empty %}
+    <div class="empty-state card"><span class="empty-state-icon" aria-hidden="true">01</span><h2>Comience con el primer hallazgo</h2><p>Después podrá agregar una o varias recomendaciones y asignarlas a las instituciones responsables.</p><a class="button button-primary" href="{% url 'finding_create' case.pk %}">Agregar primer hallazgo</a></div>
+    {% endfor %}
+</section>
+
+<section class="builder-next card">
+    <div><p class="eyebrow">Siguiente paso</p><h2>Revisar y publicar</h2><p>{% if publication_issues %}Todavía hay {{ publication_issues|length }} requisito{{ publication_issues|length|pluralize }} por completar.{% else %}El expediente reúne los requisitos básicos para su revisión final.{% endif %}</p></div>
+    <a class="button button-primary button-large" href="{% url 'case_publish' case.pk %}">Continuar a revisión <span aria-hidden="true">→</span></a>
+</section>
+{% endblock %}

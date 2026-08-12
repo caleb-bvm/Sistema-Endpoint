@@ -14,7 +14,7 @@ from apps.accounts.models import User
 from apps.core.validators import validate_evidence_file
 from apps.institutions.models import Organization
 
-from .models import AuditCase, Evidence, Finding, Recommendation, Response, Review
+from .models import ActivityLog, AuditCase, Evidence, Finding, Recommendation, Response, Review
 
 
 TEST_MEDIA_ROOT = tempfile.mkdtemp(prefix="auditoria-test-")
@@ -211,3 +211,143 @@ class AccessAndWorkflowTests(TestCase):
         self.assertEqual(result.headers["Content-Type"], "application/pdf")
         content = b"".join(result.streaming_content)
         self.assertTrue(content.startswith(b"%PDF-"))
+
+    def test_auditor_can_create_build_and_publish_a_case(self):
+        self.client.force_login(self.auditor)
+        create_response = self.client.post(
+            reverse("case_create"),
+            {
+                "reference": "IA-NEW-001",
+                "title": "Examen especial de prueba",
+                "audited_organization": self.center.pk,
+                "report_file": SimpleUploadedFile(
+                    "informe.pdf",
+                    b"%PDF-1.4\ninforme de prueba",
+                    content_type="application/pdf",
+                ),
+                "report_date": date.today().isoformat(),
+                "response_deadline": date.today().isoformat(),
+                "assigned_auditor": self.other_user.pk,
+            },
+        )
+        created_case = AuditCase.objects.get(reference="IA-NEW-001")
+        self.assertRedirects(create_response, reverse("case_builder", args=[created_case.pk]))
+        self.assertEqual(created_case.status, AuditCase.Status.DRAFT)
+        self.assertEqual(created_case.assigned_auditor, self.auditor)
+        self.assertEqual(created_case.created_by, self.auditor)
+
+        finding_response = self.client.post(
+            reverse("finding_create", args=[created_case.pk]),
+            {
+                "number": 1,
+                "title": "Falta de conciliaciones",
+                "risk_level": Finding.RiskLevel.HIGH,
+                "condition": "No se prepararon conciliaciones mensuales.",
+            },
+        )
+        self.assertRedirects(finding_response, reverse("case_builder", args=[created_case.pk]))
+        created_finding = created_case.findings.get(number=1)
+
+        recommendation_response = self.client.post(
+            reverse("recommendation_create", args=[created_finding.pk]),
+            {
+                "number": 1,
+                "text": "Prepare y apruebe las conciliaciones mensualmente.",
+                "responsible_organization": self.center.pk,
+                "deadline": date.today().isoformat(),
+                "evidence_requirements": "Conciliaciones firmadas.",
+            },
+        )
+        self.assertRedirects(
+            recommendation_response,
+            reverse("case_builder", args=[created_case.pk]),
+        )
+
+        publish_response = self.client.post(reverse("case_publish", args=[created_case.pk]))
+        self.assertRedirects(publish_response, reverse("case_detail", args=[created_case.pk]))
+        created_case.refresh_from_db()
+        self.assertEqual(created_case.status, AuditCase.Status.PUBLISHED)
+        self.assertTrue(
+            ActivityLog.objects.filter(case=created_case, action="case_published").exists()
+        )
+
+        self.client.force_login(self.institution_user)
+        visible_response = self.client.get(reverse("case_detail", args=[created_case.pk]))
+        self.assertEqual(visible_response.status_code, 200)
+
+    def test_institution_cannot_create_or_view_draft_cases(self):
+        draft_case = AuditCase.objects.create(
+            reference="IA-DRAFT-001",
+            title="Borrador reservado",
+            audited_organization=self.center,
+            status=AuditCase.Status.DRAFT,
+            assigned_auditor=self.auditor,
+            created_by=self.auditor,
+        )
+        self.client.force_login(self.institution_user)
+        create_response = self.client.get(reverse("case_create"))
+        detail_response = self.client.get(reverse("case_detail", args=[draft_case.pk]))
+        self.assertEqual(create_response.status_code, 403)
+        self.assertEqual(detail_response.status_code, 404)
+
+    def test_institution_cannot_respond_to_a_draft_recommendation_directly(self):
+        draft_case = AuditCase.objects.create(
+            reference="IA-DRAFT-DIRECT",
+            title="Borrador con recomendación",
+            audited_organization=self.center,
+            status=AuditCase.Status.DRAFT,
+            assigned_auditor=self.auditor,
+            created_by=self.auditor,
+        )
+        draft_finding = Finding.objects.create(
+            case=draft_case,
+            number=1,
+            title="Hallazgo aún no publicado",
+            risk_level=Finding.RiskLevel.MEDIUM,
+        )
+        draft_recommendation = Recommendation.objects.create(
+            finding=draft_finding,
+            number=1,
+            text="Recomendación reservada.",
+            responsible_organization=self.center,
+            deadline=date.today(),
+        )
+        self.client.force_login(self.institution_user)
+        result = self.client.get(reverse("respond_recommendation", args=[draft_recommendation.pk]))
+        self.assertEqual(result.status_code, 404)
+
+    def test_case_cannot_be_published_until_required_content_is_complete(self):
+        draft_case = AuditCase.objects.create(
+            reference="IA-DRAFT-002",
+            title="Borrador incompleto",
+            audited_organization=self.center,
+            status=AuditCase.Status.DRAFT,
+            assigned_auditor=self.auditor,
+            created_by=self.auditor,
+        )
+        self.client.force_login(self.auditor)
+        result = self.client.post(reverse("case_publish", args=[draft_case.pk]))
+        self.assertEqual(result.status_code, 200)
+        self.assertContains(result, "Adjunte el informe final en formato PDF")
+        draft_case.refresh_from_db()
+        self.assertEqual(draft_case.status, AuditCase.Status.DRAFT)
+
+    def test_unassigned_auditor_cannot_edit_a_draft(self):
+        other_auditor = User.objects.create_user(
+            username="auditor-sin-asignacion",
+            password="UnaClaveDePrueba!2026",
+            role=User.Role.AUDITOR,
+            organization=self.audit_unit,
+            must_change_password=False,
+        )
+        draft_case = AuditCase.objects.create(
+            reference="IA-DRAFT-003",
+            title="Borrador asignado",
+            audited_organization=self.center,
+            status=AuditCase.Status.DRAFT,
+            assigned_auditor=self.auditor,
+            created_by=self.auditor,
+        )
+        self.client.force_login(other_auditor)
+        result = self.client.get(reverse("case_builder", args=[draft_case.pk]))
+        self.assertEqual(result.status_code, 403)

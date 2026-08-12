@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Publicar {{ case.reference }} | Auditoría Interna{% endblock %}
+{% block content %}
+<nav class="breadcrumb" aria-label="Ruta"><a href="{% url 'case_list' %}">Expedientes</a><span>/</span><a href="{% url 'case_builder' case.pk %}">{{ case.reference }}</a><span>/</span><span>Publicar</span></nav>
+
+<ol class="workflow-steps" aria-label="Progreso del expediente">
+    <li class="is-complete"><span>✓</span><div><strong>Datos generales</strong><small>Informe y asignación</small></div></li>
+    <li class="is-complete"><span>✓</span><div><strong>Contenido</strong><small>Hallazgos y recomendaciones</small></div></li>
+    <li class="is-active"><span>3</span><div><strong>Publicación</strong><small>Revisión final</small></div></li>
+</ol>
+
+<div class="page-heading">
+    <p class="eyebrow">Revisión final · {{ case.reference }}</p>
+    <h1>Publicar expediente</h1>
+    <p>Verifique la asignación y el contenido. Al publicar, las instituciones responsables podrán consultar las recomendaciones y presentar respuestas.</p>
+</div>
+
+{% if publication_issues %}
+<section class="publication-check publication-check-warning" aria-labelledby="requisitos-pendientes">
+    <div class="publication-check-icon" aria-hidden="true">!</div>
+    <div><h2 id="requisitos-pendientes">Faltan requisitos para publicar</h2><ul>{% for issue in publication_issues %}<li>{{ issue }}</li>{% endfor %}</ul><a class="button button-secondary" href="{% url 'case_edit' case.pk %}">Completar datos generales</a></div>
+</section>
+{% else %}
+<section class="publication-check publication-check-ready"><div class="publication-check-icon" aria-hidden="true">✓</div><div><h2>Expediente listo para publicación</h2><p>Todos los requisitos básicos fueron completados.</p></div></section>
+{% endif %}
+
+<section class="publish-summary card">
+    <div class="form-section-heading"><div><span>01</span><h2>Datos generales</h2></div><a class="text-link" href="{% url 'case_edit' case.pk %}">Editar</a></div>
+    <dl class="summary-grid">
+        <div><dt>Referencia</dt><dd>{{ case.reference }}</dd></div>
+        <div><dt>Institución auditada</dt><dd>{{ case.audited_organization.name }}</dd></div>
+        <div><dt>Auditor responsable</dt><dd>{{ case.assigned_auditor.get_full_name|default:case.assigned_auditor.username }}</dd></div>
+        <div><dt>Fecha límite</dt><dd>{{ case.response_deadline|date:"d/m/Y"|default:"Sin definir" }}</dd></div>
+    </dl>
+    <div class="publish-content-summary">
+        <div class="form-section-heading"><div><span>02</span><h2>Contenido</h2></div><a class="text-link" href="{% url 'case_builder' case.pk %}">Editar</a></div>
+        {% for finding in findings %}<div class="publish-finding"><strong>Hallazgo {{ finding.number }} · {{ finding.title }}</strong><span>{{ finding.recommendations.all|length }} recomendación{{ finding.recommendations.all|length|pluralize }}</span></div>{% empty %}<p class="muted">No hay hallazgos registrados.</p>{% endfor %}
+    </div>
+</section>
+
+<form method="post" class="publish-action card">
+    {% csrf_token %}
+    <div><strong>Confirmación de publicación</strong><p>Después de publicar, el contenido quedará disponible para respuesta y ya no podrá editarse como borrador.</p></div>
+    <div class="button-group"><a class="button button-ghost" href="{% url 'case_builder' case.pk %}">Volver al contenido</a><button class="button button-primary button-large" type="submit" {% if publication_issues %}disabled{% endif %}>Publicar expediente</button></div>
+</form>
+{% endblock %}

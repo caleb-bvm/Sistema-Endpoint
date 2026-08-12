@@ -1,8 +1,113 @@
+from pathlib import Path
+
 from django import forms
+
+from apps.accounts.models import User
+from apps.institutions.models import Organization
 
 from apps.core.validators import validate_evidence_file
 
-from .models import Evidence, Response, Review
+from .models import AuditCase, Evidence, Finding, Recommendation, Response, Review
+
+
+class AuditCaseForm(forms.ModelForm):
+    class Meta:
+        model = AuditCase
+        fields = (
+            "reference",
+            "title",
+            "audited_organization",
+            "report_file",
+            "report_date",
+            "period_start",
+            "period_end",
+            "response_deadline",
+            "assigned_auditor",
+        )
+        widgets = {
+            "title": forms.Textarea(attrs={"rows": 2}),
+            "report_file": forms.ClearableFileInput(attrs={"accept": ".pdf,application/pdf"}),
+            "report_date": forms.DateInput(attrs={"type": "date"}),
+            "period_start": forms.DateInput(attrs={"type": "date"}),
+            "period_end": forms.DateInput(attrs={"type": "date"}),
+            "response_deadline": forms.DateInput(attrs={"type": "date"}),
+        }
+        help_texts = {
+            "reference": "Use la referencia oficial y única del informe.",
+            "report_file": "Puede guardarlo como borrador sin informe; se exigirá un PDF antes de publicar.",
+            "response_deadline": "Fecha general para que las instituciones responsables respondan.",
+        }
+
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.user = user
+        self.fields["audited_organization"].queryset = Organization.objects.filter(
+            is_active=True
+        ).order_by("name")
+        self.fields["assigned_auditor"].queryset = User.objects.filter(
+            is_active=True,
+            role=User.Role.AUDITOR,
+        ).order_by("first_name", "last_name", "username")
+        if user and user.role == User.Role.AUDITOR:
+            self.fields["assigned_auditor"].queryset = User.objects.filter(pk=user.pk)
+            self.fields["assigned_auditor"].initial = user.pk
+            self.fields["assigned_auditor"].disabled = True
+            self.fields["assigned_auditor"].help_text = "El expediente quedará asignado a usted."
+
+    def clean_report_file(self):
+        report = self.cleaned_data.get("report_file")
+        if report and Path(report.name).suffix.lower() != ".pdf":
+            raise forms.ValidationError("El informe de auditoría debe ser un archivo PDF.")
+        return report
+
+    def clean(self):
+        cleaned = super().clean()
+        period_start = cleaned.get("period_start")
+        period_end = cleaned.get("period_end")
+        report_date = cleaned.get("report_date")
+        response_deadline = cleaned.get("response_deadline")
+        if period_start and period_end and period_start > period_end:
+            self.add_error("period_end", "El fin del período no puede ser anterior al inicio.")
+        if report_date and response_deadline and response_deadline < report_date:
+            self.add_error(
+                "response_deadline",
+                "La fecha límite de respuesta no puede ser anterior a la fecha del informe.",
+            )
+        return cleaned
+
+
+class FindingForm(forms.ModelForm):
+    class Meta:
+        model = Finding
+        fields = ("number", "title", "risk_level", "condition", "criteria", "cause", "effect")
+        widgets = {
+            "title": forms.Textarea(attrs={"rows": 2}),
+            "condition": forms.Textarea(attrs={"rows": 4}),
+            "criteria": forms.Textarea(attrs={"rows": 3}),
+            "cause": forms.Textarea(attrs={"rows": 3}),
+            "effect": forms.Textarea(attrs={"rows": 3}),
+        }
+
+
+class RecommendationForm(forms.ModelForm):
+    class Meta:
+        model = Recommendation
+        fields = ("number", "text", "responsible_organization", "deadline", "evidence_requirements")
+        widgets = {
+            "text": forms.Textarea(attrs={"rows": 5}),
+            "deadline": forms.DateInput(attrs={"type": "date"}),
+            "evidence_requirements": forms.Textarea(attrs={"rows": 4}),
+        }
+        help_texts = {
+            "responsible_organization": "Puede ser el centro auditado u otra dependencia responsable.",
+            "evidence_requirements": "Detalle los documentos que permitirán comprobar el cumplimiento.",
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["responsible_organization"].queryset = Organization.objects.filter(
+            is_active=True
+        ).order_by("name")
 
 
 class MultipleFileInput(forms.ClearableFileInput):

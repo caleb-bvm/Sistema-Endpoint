@@ -12,6 +12,8 @@ Primera base funcional para registrar expedientes, hallazgos, recomendaciones, r
 - Versionado de respuestas y revisión por Auditoría.
 - Bitácora de envíos, revisiones y descargas.
 - Panel administrativo y panel web para instituciones.
+- Flujo propio para crear borradores, registrar hallazgos y recomendaciones, revisar y publicar expedientes.
+- Importación validada del catálogo institucional desde CSV.
 
 ## Inicio local en Windows
 
@@ -37,3 +39,7 @@ La primera ejecución de `seed_demo` genera credenciales temporales y las muestr
 La aplicación de producción usa `config.settings.production`, PostgreSQL y variables de entorno. Consulte [.env.example](.env.example) como inventario de configuración. El almacenamiento de evidencias debe ubicarse fuera del directorio público y conectarse con el antivirus institucional antes de habilitar descargas.
 
 Nunca use el servidor de desarrollo ni la clave incluida en `config/settings/development.py` en un servidor institucional.
+
+## Catálogo de centros y cuentas
+
+La estrategia recomendada es cargar todas las instituciones, pero activar cuentas personales solamente cuando se necesiten. Consulte [el plan de catálogo institucional y cuentas](docs/user-provisioning-plan.md) para conocer responsabilidades, controles y fases de despliegue.
