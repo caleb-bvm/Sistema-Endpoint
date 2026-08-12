@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Resumen | Auditoría Interna{% endblock %}
+{% block content %}
+<section class="welcome-panel">
+    <div class="welcome-copy">
+        <p class="eyebrow">Sistema de seguimiento</p>
+        <h1>Panel general</h1>
+        <p>{% if user.is_audit_staff %}Consulte el estado general de los expedientes y gestione las respuestas pendientes de revisión.{% else %}Consulte los expedientes asignados y dé seguimiento a las recomendaciones pendientes de su institución.{% endif %}</p>
+        <a class="button button-primary" href="{% url 'case_list' %}">Consultar expedientes <span aria-hidden="true">→</span></a>
+    </div>
+    <div class="welcome-visual" aria-hidden="true">
+        <span class="visual-ring"></span>
+        <span class="visual-card visual-card-back"></span>
+        <span class="visual-card visual-card-front"><b>✓</b><i></i><i></i><i></i></span>
+    </div>
+</section>
+
+<section class="stats-grid" aria-label="Indicadores">
+    <article class="stat-card stat-primary"><div class="stat-icon" aria-hidden="true">▤</div><div><span>Expedientes asignados</span><strong>{{ total_cases }}</strong><small>según su ámbito de acceso</small></div></article>
+    <article class="stat-card stat-secondary"><div class="stat-icon" aria-hidden="true">◔</div><div><span>Expedientes en seguimiento</span><strong>{{ open_cases }}</strong><small>con gestión vigente</small></div></article>
+    <article class="stat-card stat-tertiary"><div class="stat-icon" aria-hidden="true">!</div><div><span>{% if user.is_audit_staff %}Respuestas por revisar{% else %}Acciones pendientes{% endif %}</span><strong>{{ pending_recommendations }}</strong><small>{% if pending_recommendations %}pendientes de gestión{% else %}sin acciones pendientes{% endif %}</small></div></article>
+</section>
+
+<section class="section-block">
+    <div class="section-heading">
+        <div><p class="eyebrow">Actividad reciente</p><h2>Expedientes recientes</h2></div>
+        <a class="text-link arrow-link" href="{% url 'case_list' %}">Consultar todos <span aria-hidden="true">→</span></a>
+    </div>
+    <div class="card table-card">
+        {% if recent_cases %}
+        <div class="table-responsive">
+            <table>
+                <thead><tr><th>Referencia</th><th>Institución</th><th>Estado</th><th>Fecha límite</th><th></th></tr></thead>
+                <tbody>
+                {% for case in recent_cases %}
+                <tr>
+                    <td><strong>{{ case.reference }}</strong><small>{{ case.title|truncatechars:65 }}</small></td>
+                    <td>{{ case.audited_organization.name }}</td>
+                    <td><span class="status status-{{ case.status }}">{{ case.get_status_display }}</span></td>
+                    <td>{{ case.response_deadline|date:"d/m/Y"|default:"Por definir" }}</td>
+                    <td><a class="icon-link" aria-label="Abrir {{ case.reference }}" href="{% url 'case_detail' case.pk %}">→</a></td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}<div class="empty-state"><h3>No hay expedientes disponibles</h3><p>Los nuevos informes aparecerán aquí cuando sean asignados.</p></div>{% endif %}
+    </div>
+</section>
+{% endblock %}

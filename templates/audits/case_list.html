@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Expedientes | Auditoría Interna{% endblock %}
+{% block content %}
+<div class="page-heading">
+    <p class="eyebrow">Gestión de auditoría</p>
+    <h1>Expedientes</h1>
+    <p>Consulte los informes de auditoría, las recomendaciones emitidas, las respuestas institucionales y los resultados de revisión.</p>
+</div>
+<form method="get" class="filter-bar" role="search">
+    <div class="field grow search-field"><label for="q">Criterio de búsqueda</label><div class="input-with-icon"><span aria-hidden="true">⌕</span><input id="q" name="q" value="{{ request.GET.q }}" placeholder="Ingrese referencia, institución o código"></div></div>
+    <div class="field"><label for="status">Estado</label><select id="status" name="status"><option value="">Todos</option>{% for value, label in statuses %}<option value="{{ value }}" {% if request.GET.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+    <button class="button button-tonal" type="submit">Filtrar resultados</button>
+</form>
+<div class="case-grid">
+    {% for case in cases %}
+    <article class="case-card">
+        <div class="case-card-accent" aria-hidden="true"></div>
+        <div class="case-card-top"><span class="status status-{{ case.status }}">{{ case.get_status_display }}</span><span class="case-reference">{{ case.reference }}</span></div>
+        <h2>{{ case.audited_organization.name }}</h2>
+        <p>{{ case.title }}</p>
+        <dl class="meta-list"><div><dt>Código</dt><dd>{{ case.audited_organization.code }}</dd></div><div><dt>Fecha límite</dt><dd>{{ case.response_deadline|date:"d/m/Y"|default:"Por definir" }}</dd></div></dl>
+        <a class="button button-tonal button-block" href="{% url 'case_detail' case.pk %}">Ver expediente <span aria-hidden="true">→</span></a>
+    </article>
+    {% empty %}<div class="empty-state card"><h2>No se encontraron expedientes</h2><p>Pruebe con otros criterios de búsqueda.</p></div>{% endfor %}
+</div>
+{% if is_paginated %}<nav class="pagination" aria-label="Paginación">{% if page_obj.has_previous %}<a href="?page={{ page_obj.previous_page_number }}">Anterior</a>{% endif %}<span>Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>{% if page_obj.has_next %}<a href="?page={{ page_obj.next_page_number }}">Siguiente</a>{% endif %}</nav>{% endif %}
+{% endblock %}

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}{{ case.reference }} | Auditoría Interna{% endblock %}
+{% block content %}
+<nav class="breadcrumb" aria-label="Ruta"><a href="{% url 'case_list' %}">Expedientes</a><span>/</span><span>{{ case.reference }}</span></nav>
+<div class="page-heading heading-row">
+    <div><p class="eyebrow">{{ case.reference }}</p><h1>{{ case.audited_organization.name }}</h1><p>{{ case.title }}</p></div>
+    <span class="status status-large status-{{ case.status }}">{{ case.get_status_display }}</span>
+</div>
+<section class="case-summary card">
+    <dl class="summary-grid">
+        <div><dt>Código institucional</dt><dd>{{ case.audited_organization.code }}</dd></div>
+        <div><dt>Auditor responsable</dt><dd>{{ case.assigned_auditor.get_full_name|default:case.assigned_auditor.username }}</dd></div>
+        <div><dt>Fecha del informe</dt><dd>{{ case.report_date|date:"d/m/Y"|default:"Por definir" }}</dd></div>
+        <div><dt>Fecha límite</dt><dd>{{ case.response_deadline|date:"d/m/Y"|default:"Por definir" }}</dd></div>
+    </dl>
+</section>
+
+<section class="section-block">
+    <div class="section-heading"><div><p class="eyebrow">Contenido del informe</p><h2>Hallazgos y recomendaciones</h2></div></div>
+    {% for finding in findings %}
+    <article class="finding-card">
+        <header><div><span class="finding-number">Hallazgo {{ finding.number }}</span><h3>{{ finding.title }}</h3></div><span class="risk risk-{{ finding.risk_level }}">Riesgo {{ finding.get_risk_level_display }}</span></header>
+        {% if finding.condition %}<details><summary>Consultar condición del hallazgo</summary><p>{{ finding.condition|linebreaksbr }}</p></details>{% endif %}
+        <div class="recommendations">
+        {% for recommendation in finding.recommendations.all %}
+            <section class="recommendation-card">
+                <div class="recommendation-header"><span class="recommendation-number">Recomendación {{ recommendation.number }}</span><span class="status status-{{ recommendation.status }}">{{ recommendation.get_status_display }}</span></div>
+                <p class="recommendation-text">{{ recommendation.text|linebreaksbr }}</p>
+                <dl class="meta-list horizontal"><div><dt>Responsable</dt><dd>{{ recommendation.responsible_organization.name }}</dd></div><div><dt>Fecha límite</dt><dd>{{ recommendation.deadline|date:"d/m/Y"|default:"Por definir" }}</dd></div></dl>
+                {% if recommendation.evidence_requirements %}<div class="requirement-box"><strong>Documentación requerida</strong><p>{{ recommendation.evidence_requirements|linebreaksbr }}</p></div>{% endif %}
+
+                {% for response in recommendation.responses.all %}
+                <div class="response-block">
+                    <div class="response-title"><strong>Respuesta institucional · versión {{ response.version }}</strong><span>{{ response.submitted_at|date:"d/m/Y H:i" }}</span></div>
+                    <p><strong>Estado declarado:</strong> {{ response.get_declared_status_display }}</p>
+                    <p>{{ response.action_description|linebreaksbr }}</p>
+                    <p><a class="text-link" href="{% url 'response_receipt' response.pk %}">Descargar constancia de recepción</a></p>
+                    {% if response.evidence.all %}<div class="evidence-list"><strong>Documentación adjunta</strong>{% for item in response.evidence.all %}<a href="{% url 'download_evidence' item.pk %}"><span>{{ item.original_filename }}</span><small>{{ item.get_category_display }} · {{ item.get_scan_status_display }}</small></a>{% endfor %}</div>{% endif %}
+                    {% if response.review %}<div class="review-result"><strong>Resultado: {{ response.review.get_outcome_display }}</strong><p>{{ response.review.comments|linebreaksbr }}</p></div>{% elif user.is_audit_staff %}<a class="button button-secondary" href="{% url 'review_response' response.pk %}">Revisar respuesta</a>{% endif %}
+                </div>
+                {% endfor %}
+
+                {% if user.role == 'institution' and user.organization_id == recommendation.responsible_organization_id and recommendation.status == 'pending' or user.role == 'institution' and user.organization_id == recommendation.responsible_organization_id and recommendation.status == 'correction_required' %}
+                <a class="button button-primary" href="{% url 'respond_recommendation' recommendation.pk %}">{% if recommendation.status == 'correction_required' %}Presentar corrección{% else %}Presentar respuesta{% endif %}</a>
+                {% endif %}
+            </section>
+        {% empty %}<p class="muted">Este hallazgo aún no tiene recomendaciones registradas.</p>{% endfor %}
+        </div>
+    </article>
+    {% empty %}<div class="empty-state card"><h2>No hay hallazgos registrados</h2><p>Auditoría Interna se encuentra en proceso de integración de este expediente.</p></div>{% endfor %}
+</section>
+{% endblock %}

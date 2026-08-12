@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Ingresar | Auditoría Interna{% endblock %}
+{% block content %}
+<section class="login-layout">
+    <div class="login-intro">
+        <div class="login-orb login-orb-one" aria-hidden="true"></div>
+        <div class="login-orb login-orb-two" aria-hidden="true"></div>
+        <div class="login-copy">
+            <p class="eyebrow">Sistema institucional de auditoría</p>
+            <h1>Seguimiento de <em>recomendaciones</em></h1>
+            <p>Plataforma para la consulta de expedientes, la presentación de respuestas y la gestión de documentación de respaldo.</p>
+            <div class="process-chips" aria-label="Proceso del sistema">
+                <span><b>1</b> Consulte expedientes</span><span><b>2</b> Presente respuestas</span><span><b>3</b> Verifique resultados</span>
+            </div>
+            <div class="security-note">
+                <span class="security-icon" aria-hidden="true">◇</span>
+                <span><strong>Registro y trazabilidad</strong><small>Las operaciones y los documentos quedan registrados en el expediente correspondiente.</small></span>
+            </div>
+        </div>
+    </div>
+    <div class="login-card">
+        <span class="login-card-icon" aria-hidden="true">→</span>
+        <p class="eyebrow">Acceso al sistema</p>
+        <h2>Inicio de sesión</h2>
+        <p>Utilice las credenciales asignadas a su institución.</p>
+        {% if form.errors %}<div class="form-error">Las credenciales ingresadas no son válidas.</div>{% endif %}
+        <form method="post" class="stacked-form">
+            {% csrf_token %}
+            <div class="field">
+                <label for="id_username">Usuario</label>
+                {{ form.username }}
+            </div>
+            <div class="field">
+                <label for="id_password">Contraseña</label>
+                {{ form.password }}
+            </div>
+            {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+            <button class="button button-primary button-block button-large" type="submit">Iniciar sesión <span aria-hidden="true">→</span></button>
+        </form>
+        <p class="help-text">En caso de inconvenientes de acceso, comuníquese con el administrador asignado por Auditoría Interna.</p>
+    </div>
+</section>
+{% endblock %}
