@@ -7,27 +7,10 @@
     <meta name="description" content="Sistema institucional de seguimiento de recomendaciones de Auditoría Interna">
     <title>{% block title %}Sistema de Seguimiento de Auditoría Interna{% endblock %}</title>
     <meta name="theme-color" content="#0b4a7d">
-    <link rel="stylesheet" href="{% static 'css/app.css' %}?v=20260812-4">
+    <link rel="stylesheet" href="{% static 'css/app.css' %}?v=20260813-3">
 </head>
 <body>
     <a class="skip-link" href="#contenido">Saltar al contenido</a>
-    <header class="topbar">
-        <a class="brand" href="{% url 'dashboard' %}" aria-label="Ir al inicio">
-            <span class="brand-mark" aria-hidden="true"><span>AI</span></span>
-            <span class="brand-copy"><strong>Dirección de Auditoría Interna</strong><small>Sistema de seguimiento institucional</small></span>
-        </a>
-        {% if user.is_authenticated %}
-        <div class="user-menu">
-            <span class="user-avatar" aria-hidden="true">{{ user.first_name|default:user.username|first|upper }}</span>
-            <span class="user-copy"><strong>{{ user.get_full_name|default:user.username }}</strong><small>{{ user.get_role_display }}</small></span>
-            <form method="post" action="{% url 'logout' %}">
-                {% csrf_token %}
-                <button class="button button-tonal button-compact" type="submit"><span aria-hidden="true">↗</span> Cerrar sesión</button>
-            </form>
-        </div>
-        {% endif %}
-    </header>
-
     {% if user.is_authenticated %}
     <div class="app-shell">
         <nav class="sidebar" aria-label="Navegación principal">
@@ -60,10 +43,20 @@
             </a>
             {% endif %}
             {% endif %}
-            <div class="sidebar-context">
-                <span class="context-icon" aria-hidden="true">◎</span>
-                <small>{% if user.role == 'audit_manager' %}Ámbito de supervisión{% else %}Institución asignada{% endif %}</small>
-                <strong>{{ user.organization.name|default:"Auditoría Interna" }}</strong>
+            <div class="sidebar-footer">
+                {% if sidebar_context %}
+                <div class="sidebar-context">
+                    <span class="context-icon" aria-hidden="true">◎</span>
+                    <small>{{ sidebar_context.label }}</small>
+                    <strong>{{ sidebar_context.value }}</strong>
+                </div>
+                {% endif %}
+                <form class="sidebar-logout-form" method="post" action="{% url 'logout' %}">
+                    {% csrf_token %}
+                    <button class="nav-item sidebar-logout" type="submit">
+                        <span class="nav-icon" aria-hidden="true">↗</span><span>Cerrar sesión</span>
+                    </button>
+                </form>
             </div>
         </nav>
         <main id="contenido" class="content">
