@@ -192,7 +192,7 @@ def cde_period_create(request, organization_pk):
             "form": form,
             "organization": organization,
             "title": "Registrar período del CDE",
-            "eyebrow": "Nueva conformación",
+            "eyebrow": "Consejo Directivo Escolar",
             "intro": (
                 "El período vigente anterior se conservará como finalizado cuando registre este CDE."
             ),
@@ -229,8 +229,8 @@ def cde_period_edit(request, pk):
             "form": form,
             "organization": organization,
             "title": "Corregir período del CDE",
-            "eyebrow": "Corrección con trazabilidad",
-            "intro": "La bitácora conservará los valores anteriores y los nuevos.",
+            "eyebrow": "Consejo Directivo Escolar",
+            "intro": "Los valores anteriores y los nuevos quedarán registrados.",
             "submit_label": "Guardar corrección",
         },
     )
@@ -305,7 +305,7 @@ def cde_member_edit(request, pk):
             "form": form,
             "organization": organization,
             "title": "Corregir integrante",
-            "eyebrow": "Corrección con trazabilidad",
+            "eyebrow": "Consejo Directivo Escolar",
             "intro": "La salida o sustitución se registra mediante una acción separada.",
             "submit_label": "Guardar corrección",
         },

@@ -2,9 +2,9 @@
 {% block title %}Solicitar cierre | {{ case.reference }}{% endblock %}
 {% block content %}
 <nav class="breadcrumb" aria-label="Ruta"><a href="{% url 'case_list' %}">Expedientes</a><span>/</span><a href="{% url 'case_detail' case.pk %}">{{ case.reference }}</a><span>/</span><span>Solicitar cierre</span></nav>
-<div class="page-heading"><p class="eyebrow">Control de cierre</p><h1>Solicitar cierre del expediente</h1><p>{{ case.audited_organization.name }} · La decisión final corresponde a la Dirección de Auditoría.</p></div>
+<div class="page-heading"><p class="eyebrow">Expediente {{ case.reference }}</p><h1>Solicitar cierre</h1><p>{{ case.audited_organization.name }} · La Dirección de Auditoría revisará la solicitud.</p></div>
 
-{% if closure_issues %}<section class="publication-check publication-check-warning"><div class="publication-check-icon" aria-hidden="true">!</div><div><h2>El expediente todavía no puede cerrarse</h2><ul>{% for issue in closure_issues %}<li>{{ issue }}</li>{% endfor %}</ul></div></section>{% else %}<section class="publication-check publication-check-ready"><div class="publication-check-icon" aria-hidden="true">✓</div><div><h2>Recomendaciones con resultado definitivo</h2><p>Puede remitir la solicitud para decisión directiva.</p></div></section>{% endif %}
+{% if closure_issues %}<section class="publication-check publication-check-warning"><div class="publication-check-icon" aria-hidden="true">!</div><div><h2>El expediente todavía no puede cerrarse</h2><ul>{% for issue in closure_issues %}<li>{{ issue }}</li>{% endfor %}</ul></div></section>{% else %}<section class="publication-check publication-check-ready"><div class="publication-check-icon" aria-hidden="true">✓</div><div><h2>El expediente puede cerrarse</h2><p>Puede enviar la solicitud a la Dirección de Auditoría.</p></div></section>{% endif %}
 
 <form method="post" class="editor-form card">
     {% csrf_token %}

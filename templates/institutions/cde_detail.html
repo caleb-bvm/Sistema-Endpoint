@@ -35,7 +35,7 @@
 
 {% if periods %}
 <section class="section-block">
-    <div class="section-heading"><div><p class="eyebrow">Huella institucional</p><h2>Períodos registrados</h2></div></div>
+    <div class="section-heading"><div><p class="eyebrow">Historial</p><h2>Períodos registrados</h2></div></div>
     <div class="cde-period-list">
         {% for period in periods %}
         <article class="cde-period card">
@@ -63,7 +63,7 @@
                     <tbody>
                     {% for member in period.members.all %}
                     <tr>
-                        <td><strong>{{ member.full_name }}</strong>{% if member.identity_document %}<small>ID: {{ member.identity_document }}</small>{% endif %}</td>
+                        <td><strong>{{ member.full_name }}</strong>{% if member.identity_document %}<small>DUI: {{ member.identity_document }}</small>{% endif %}</td>
                         <td>{{ member.position }}<small>{{ member.get_sector_display }}</small></td>
                         <td>{{ member.joined_on|date:"d/m/Y" }}{% if member.left_on %} — {{ member.left_on|date:"d/m/Y" }}<small>{{ member.exit_reason }}</small>{% else %}<small>Integrante activo</small>{% endif %}</td>
                         <td>{% if member.is_legal_representative %}<span class="status status-approved">Sí</span>{% else %}<span class="muted">No</span>{% endif %}</td>
@@ -84,7 +84,7 @@
 
 {% if activity %}
 <section class="section-block">
-    <div class="section-heading"><div><p class="eyebrow">Trazabilidad</p><h2>Bitácora del CDE</h2></div></div>
+    <div class="section-heading"><div><p class="eyebrow">Actividad</p><h2>Cambios registrados</h2></div></div>
     <div class="card cde-timeline">
         {% for event in activity %}
         <div class="cde-event"><span aria-hidden="true"></span><div><strong>{{ event.details.summary }}</strong><small>{{ event.created_at|date:"d/m/Y H:i" }} · {{ event.actor.username|default:"Sistema" }}</small></div></div>

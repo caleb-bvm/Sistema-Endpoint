@@ -137,7 +137,7 @@ class SchoolBoardTests(TestCase):
             reverse("cde_member_create", args=[period.pk]),
             {
                 "full_name": "María López",
-                "identity_document": "ID-100",
+                "identity_document": "00000000-0",
                 "position": "Presidenta",
                 "sector": SchoolBoardMember.Sector.PARENTS,
                 "is_legal_representative": "on",
@@ -162,6 +162,42 @@ class SchoolBoardTests(TestCase):
         self.assertTrue(SchoolBoardMember.objects.filter(pk=member.pk).exists())
         self.assertTrue(ActivityLog.objects.filter(action="cde_member_added").exists())
         self.assertTrue(ActivityLog.objects.filter(action="cde_member_departed").exists())
+
+    def test_dui_must_use_the_salvadoran_format(self):
+        period = self.create_period()
+        self.client.force_login(self.institution)
+
+        invalid = self.client.post(
+            reverse("cde_member_create", args=[period.pk]),
+            {
+                "full_name": "Persona con DUI inválido",
+                "identity_document": "000000000",
+                "position": "Vocal",
+                "sector": SchoolBoardMember.Sector.PARENTS,
+                "joined_on": "2026-01-01",
+            },
+        )
+
+        self.assertEqual(invalid.status_code, 200)
+        self.assertContains(invalid, "Ingrese el DUI con el formato 00000000-0")
+        self.assertFalse(SchoolBoardMember.objects.filter(period=period).exists())
+
+        valid = self.client.post(
+            reverse("cde_member_create", args=[period.pk]),
+            {
+                "full_name": "Persona con DUI válido",
+                "identity_document": "00000000-0",
+                "position": "Vocal",
+                "sector": SchoolBoardMember.Sector.PARENTS,
+                "joined_on": "2026-01-01",
+            },
+        )
+
+        self.assertRedirects(valid, reverse("cde_detail", args=[self.center.pk]))
+        self.assertEqual(
+            SchoolBoardMember.objects.get(period=period).identity_document,
+            "00000000-0",
+        )
 
     def test_correction_keeps_previous_and_new_values_in_activity_log(self):
         period = self.create_period(notes="Texto anterior")

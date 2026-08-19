@@ -865,7 +865,7 @@ def historical_document_create(request):
         log_activity(request, "historical_document_uploaded", target=document)
         messages.success(
             request,
-            "El informe histórico fue registrado. Ahora agregue sus recomendaciones pendientes.",
+            "El informe fue registrado. Ahora agregue sus recomendaciones pendientes.",
         )
         return redirect("historical_document_detail", pk=document.pk)
     return render(request, "audits/historical_document_form.html", {"form": form})
@@ -908,7 +908,7 @@ def historical_recommendation_create(request, document_pk):
         recommendation.recorded_by = request.user
         recommendation.save()
         log_activity(request, "historical_recommendation_recorded", target=recommendation)
-        messages.success(request, "La recomendación histórica fue registrada.")
+        messages.success(request, "La recomendación fue registrada.")
         return redirect("historical_document_detail", pk=document.pk)
     return render(
         request,

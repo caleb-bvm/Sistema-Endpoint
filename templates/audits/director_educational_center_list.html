@@ -4,17 +4,17 @@
 <div class="center-directory">
     <div class="page-heading heading-row">
         <div>
-            <p class="eyebrow">Acceso institucional</p>
+            <p class="eyebrow">Directorio</p>
             <h1>Centros educativos</h1>
-            <p>Localice un centro, consulte sus expedientes y verifique si ya tiene acceso al sistema.</p>
+            <p>Busque un centro, consulte sus expedientes y gestione su acceso al sistema.</p>
         </div>
-        <a class="button button-secondary" href="{% url 'director_dashboard' %}">Volver al resumen</a>
+        <a class="button button-secondary" href="{% url 'director_dashboard' %}">Volver al inicio</a>
     </div>
 
     <section class="executive-stats center-access-stats" aria-label="Resumen de centros educativos">
-        <article class="executive-stat"><span>Centros registrados</span><strong>{{ total_centers }}</strong><small>en el catálogo institucional</small></article>
-        <article class="executive-stat executive-stat-success"><span>Con acceso</span><strong>{{ active_centers }}</strong><small>con usuario institucional activo</small></article>
-        <article class="executive-stat executive-stat-attention"><span>Sin acceso</span><strong>{{ pending_centers }}</strong><small>pendientes de activación</small></article>
+        <article class="executive-stat"><span>Centros</span><strong>{{ total_centers }}</strong><small>registrados</small></article>
+        <article class="executive-stat executive-stat-success"><span>Con acceso</span><strong>{{ active_centers }}</strong><small>usuario activo</small></article>
+        <article class="executive-stat executive-stat-attention"><span>Sin acceso</span><strong>{{ pending_centers }}</strong><small>por activar</small></article>
     </section>
 
     <form method="get" class="filter-bar center-filter-bar" role="search">

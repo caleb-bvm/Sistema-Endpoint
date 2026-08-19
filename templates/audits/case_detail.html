@@ -29,10 +29,10 @@
                 <div class="recommendation-header"><span class="recommendation-number">Recomendación {{ recommendation.number }}</span><span class="status status-{{ recommendation.status }}">{{ recommendation.get_status_display }}</span></div>
                 <p class="recommendation-text">{{ recommendation.text|linebreaksbr }}</p>
                 <dl class="meta-list horizontal"><div><dt>Responsable</dt><dd>{{ recommendation.responsible_organization.name }}</dd></div><div><dt>Fecha límite</dt><dd>{{ recommendation.deadline|date:"d/m/Y"|default:"Por definir" }}</dd></div></dl>
-                {% if recommendation.source_recommendation %}<div class="requirement-box"><strong>Procedencia histórica</strong><p>{{ recommendation.source_recommendation.source_document.reference|default:recommendation.source_recommendation.source_document.title }} · Recomendación {{ recommendation.source_recommendation.number }} · {{ recommendation.source_recommendation.get_status_display }}</p>{% if recommendation.source_recommendation.comments %}<p>{{ recommendation.source_recommendation.comments|linebreaksbr }}</p>{% endif %}</div>{% endif %}
+                {% if recommendation.source_recommendation %}<div class="requirement-box"><strong>Informe anterior</strong><p>{{ recommendation.source_recommendation.source_document.reference|default:recommendation.source_recommendation.source_document.title }} · Recomendación {{ recommendation.source_recommendation.number }} · {{ recommendation.source_recommendation.get_status_display }}</p>{% if recommendation.source_recommendation.comments %}<p>{{ recommendation.source_recommendation.comments|linebreaksbr }}</p>{% endif %}</div>{% endif %}
                 {% if recommendation.evidence_requirements %}<div class="requirement-box"><strong>Documentación requerida</strong><p>{{ recommendation.evidence_requirements|linebreaksbr }}</p></div>{% endif %}
                 {% if recommendation.no_response_recorded_at %}<div class="review-result"><strong>Sin respuesta dentro del plazo</strong><p>El sistema registró automáticamente la recomendación como no cumplida el {{ recommendation.no_response_recorded_at|date:"d/m/Y H:i" }}.</p></div>{% endif %}
-                {% if recommendation.deadline_extensions.all %}<details><summary>Consultar historial de prórrogas</summary>{% for extension in recommendation.deadline_extensions.all %}<p><strong>{{ extension.business_days }} día{{ extension.business_days|pluralize }} hábil{{ extension.business_days|pluralize:"es" }}</strong>: {{ extension.previous_deadline|date:"d/m/Y" }} → {{ extension.new_deadline|date:"d/m/Y" }}<br>{{ extension.reason }}<br><small>{{ extension.granted_by.get_full_name|default:extension.granted_by.username }} · {{ extension.granted_at|date:"d/m/Y H:i" }}</small></p>{% endfor %}</details>{% endif %}
+                {% if recommendation.deadline_extensions.all %}<details><summary>Ver prórrogas</summary>{% for extension in recommendation.deadline_extensions.all %}<p><strong>{{ extension.business_days }} día{{ extension.business_days|pluralize }} hábil{{ extension.business_days|pluralize:"es" }}</strong>: {{ extension.previous_deadline|date:"d/m/Y" }} → {{ extension.new_deadline|date:"d/m/Y" }}<br>{{ extension.reason }}<br><small>{{ extension.granted_by.get_full_name|default:extension.granted_by.username }} · {{ extension.granted_at|date:"d/m/Y H:i" }}</small></p>{% endfor %}</details>{% endif %}
 
                 {% for response in recommendation.visible_responses %}
                 <div class="response-block">
@@ -54,6 +54,6 @@
         {% empty %}<p class="muted">Este hallazgo aún no tiene recomendaciones registradas.</p>{% endfor %}
         </div>
     </article>
-    {% empty %}<div class="empty-state card"><h2>No hay hallazgos registrados</h2><p>Auditoría Interna se encuentra en proceso de integración de este expediente.</p></div>{% endfor %}
+    {% empty %}<div class="empty-state card"><h2>No hay hallazgos</h2><p>Este expediente aún no tiene hallazgos registrados.</p></div>{% endfor %}
 </section>
 {% endblock %}

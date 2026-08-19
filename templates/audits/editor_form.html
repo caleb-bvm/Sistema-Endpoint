@@ -6,7 +6,7 @@
 <ol class="workflow-steps" aria-label="Progreso del expediente">
     <li class="is-complete"><span>✓</span><div><strong>Datos generales</strong><small>Informe y asignación</small></div></li>
     <li class="is-active"><span>2</span><div><strong>Contenido</strong><small>Hallazgos y recomendaciones</small></div></li>
-    <li><span>3</span><div><strong>Publicación</strong><small>Revisión final</small></div></li>
+    <li><span>3</span><div><strong>Aprobación</strong><small>Revisión final</small></div></li>
 </ol>
 
 <div class="page-heading">
@@ -29,7 +29,7 @@
         {% endfor %}
     </div>
     <div class="submit-panel">
-        <p>Los cambios permanecerán en borrador hasta la publicación del expediente.</p>
+        <p>Los cambios permanecerán en borrador hasta que se apruebe el expediente.</p>
         <div class="button-group">
             <a class="button button-ghost" href="{% url 'case_builder' case.pk %}">Cancelar</a>
             <button class="button button-primary" type="submit">{{ submit_label }}</button>

@@ -59,10 +59,19 @@ class SchoolBoardMemberForm(forms.ModelForm):
             "joined_on",
         )
         widgets = {
+            "identity_document": forms.TextInput(
+                attrs={
+                    "placeholder": "00000000-0",
+                    "maxlength": "10",
+                    "pattern": r"[0-9]{8}-[0-9]",
+                    "title": "Número de DUI",
+                    "autocomplete": "off",
+                }
+            ),
             "joined_on": forms.DateInput(attrs={"type": "date"}),
         }
         help_texts = {
-            "identity_document": "Opcional, cuando corresponda registrarlo.",
+            "identity_document": "Formato: 00000000-0.",
             "is_legal_representative": (
                 "Marque esta opción si la persona representa legalmente al centro durante el período."
             ),

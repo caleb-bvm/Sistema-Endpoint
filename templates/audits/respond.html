@@ -2,7 +2,7 @@
 {% block title %}Responder recomendación{% endblock %}
 {% block content %}
 <nav class="breadcrumb" aria-label="Ruta"><a href="{% url 'case_detail' case.pk %}">{{ case.reference }}</a><span>/</span><span>Respuesta</span></nav>
-<div class="page-heading"><p class="eyebrow">Hallazgo {{ recommendation.finding.number }} · Recomendación {{ recommendation.number }}</p><h1>Presentar respuesta</h1><p>Registre las acciones realizadas y adjunte la documentación de respaldo correspondiente.</p></div>
+<div class="page-heading"><p class="eyebrow">Hallazgo {{ recommendation.finding.number }} · Recomendación {{ recommendation.number }}</p><h1>Presentar respuesta</h1><p>Describa las acciones realizadas y adjunte los documentos de respaldo.</p></div>
 <div class="two-column">
     <aside class="card sticky-card"><h2>Recomendación emitida</h2><p>{{ recommendation.text|linebreaksbr }}</p>{% if recommendation.evidence_requirements %}<div class="requirement-box"><strong>Documentación requerida</strong><p>{{ recommendation.evidence_requirements|linebreaksbr }}</p></div>{% endif %}<p><strong>Fecha límite:</strong> {{ recommendation.deadline|date:"d/m/Y"|default:"Por definir" }}</p></aside>
     <form method="post" enctype="multipart/form-data" class="card stacked-form response-form">

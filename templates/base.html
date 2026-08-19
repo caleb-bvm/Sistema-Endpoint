@@ -14,13 +14,13 @@
     {% if user.is_authenticated %}
     <div class="app-shell">
         <nav class="sidebar" aria-label="Navegación principal">
-            <div class="nav-label">{% if user.role == 'audit_manager' %}Dirección de Auditoría{% else %}Gestión institucional{% endif %}</div>
+            <div class="nav-label">{% if user.is_audit_staff %}Auditoría Interna{% else %}Portal institucional{% endif %}</div>
             {% if user.role == 'audit_manager' %}
             <a href="{% url 'director_dashboard' %}" class="nav-item {% if request.resolver_match.url_name == 'director_dashboard' %}is-active{% endif %}" {% if request.resolver_match.url_name == 'director_dashboard' %}aria-current="page"{% endif %}>
-                <span class="nav-icon" aria-hidden="true">⌂</span><span>Resumen ejecutivo</span>
+                <span class="nav-icon" aria-hidden="true">⌂</span><span>Inicio</span>
             </a>
             <a href="{% url 'director_decisions' %}" class="nav-item {% if request.resolver_match.url_name == 'director_decisions' or request.resolver_match.url_name == 'director_decision_detail' %}is-active{% endif %}" {% if request.resolver_match.url_name == 'director_decisions' or request.resolver_match.url_name == 'director_decision_detail' %}aria-current="page"{% endif %}>
-                <span class="nav-icon" aria-hidden="true">✓</span><span>Bandeja de decisiones</span>
+                <span class="nav-icon" aria-hidden="true">✓</span><span>Solicitudes</span>
             </a>
             <a href="{% url 'director_educational_centers' %}" class="nav-item {% if request.resolver_match.url_name == 'director_educational_centers' or 'cde_' in request.resolver_match.url_name %}is-active{% endif %}" {% if request.resolver_match.url_name == 'director_educational_centers' or 'cde_' in request.resolver_match.url_name %}aria-current="page"{% endif %}>
                 <span class="nav-icon" aria-hidden="true">◉</span><span>Centros educativos</span>
@@ -29,22 +29,22 @@
                 <span class="nav-icon" aria-hidden="true">▤</span><span>Expedientes</span>
             </a>
             <a href="{% url 'historical_document_list' %}" class="nav-item {% if 'historical_' in request.resolver_match.url_name %}is-active{% endif %}">
-                <span class="nav-icon" aria-hidden="true">⌕</span><span>Informes históricos</span>
+                <span class="nav-icon" aria-hidden="true">⌕</span><span>Informes</span>
             </a>
             {% else %}
             <a href="{% url 'dashboard' %}" class="nav-item {% if request.resolver_match.url_name == 'dashboard' %}is-active{% endif %}" {% if request.resolver_match.url_name == 'dashboard' %}aria-current="page"{% endif %}>
-                <span class="nav-icon" aria-hidden="true">⌂</span><span>Resumen</span>
+                <span class="nav-icon" aria-hidden="true">⌂</span><span>Inicio</span>
             </a>
             <a href="{% url 'case_list' %}" class="nav-item {% if request.resolver_match.url_name == 'case_list' or request.resolver_match.url_name == 'case_detail' or request.resolver_match.url_name == 'respond_recommendation' or request.resolver_match.url_name == 'review_response' %}is-active{% endif %}" {% if request.resolver_match.url_name == 'case_list' or request.resolver_match.url_name == 'case_detail' or request.resolver_match.url_name == 'respond_recommendation' or request.resolver_match.url_name == 'review_response' %}aria-current="page"{% endif %}>
                 <span class="nav-icon" aria-hidden="true">▤</span><span>Expedientes</span>
             </a>
-            {% if user.role == 'institution' %}<a href="{% url 'institution_history' %}" class="nav-item {% if request.resolver_match.url_name == 'institution_history' %}is-active{% endif %}"><span class="nav-icon" aria-hidden="true">◷</span><span>Mi historial</span></a><a href="{% url 'cde_home' %}" class="nav-item {% if 'cde_' in request.resolver_match.url_name %}is-active{% endif %}"><span class="nav-icon" aria-hidden="true">♙</span><span>Consejo Directivo</span></a>{% endif %}
+            {% if user.role == 'institution' %}<a href="{% url 'institution_history' %}" class="nav-item {% if request.resolver_match.url_name == 'institution_history' %}is-active{% endif %}"><span class="nav-icon" aria-hidden="true">◷</span><span>Historial</span></a><a href="{% url 'cde_home' %}" class="nav-item {% if 'cde_' in request.resolver_match.url_name %}is-active{% endif %}"><span class="nav-icon" aria-hidden="true">♙</span><span>Consejo Directivo</span></a>{% endif %}
             {% if user.role == 'auditor' %}
             <a href="{% url 'case_create' %}" class="nav-item {% if request.resolver_match.url_name == 'case_create' or request.resolver_match.url_name == 'case_edit' or request.resolver_match.url_name == 'case_builder' or request.resolver_match.url_name == 'case_publish' or request.resolver_match.url_name == 'finding_create' or request.resolver_match.url_name == 'finding_edit' or request.resolver_match.url_name == 'recommendation_create' or request.resolver_match.url_name == 'recommendation_edit' %}is-active{% endif %}">
-                <span class="nav-icon" aria-hidden="true">＋</span><span>Preparar expediente</span>
+                <span class="nav-icon" aria-hidden="true">＋</span><span>Nuevo expediente</span>
             </a>
             <a href="{% url 'historical_document_list' %}" class="nav-item {% if 'historical_' in request.resolver_match.url_name %}is-active{% endif %}">
-                <span class="nav-icon" aria-hidden="true">⌕</span><span>Informes históricos</span>
+                <span class="nav-icon" aria-hidden="true">⌕</span><span>Informes</span>
             </a>
             {% endif %}
             {% if user.is_superuser or user.role == 'technical_admin' %}

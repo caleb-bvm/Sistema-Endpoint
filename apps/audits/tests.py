@@ -809,7 +809,7 @@ class AccessAndWorkflowTests(TestCase):
         self.client.force_login(self.director)
         result = self.client.get(reverse("director_dashboard"))
         self.assertEqual(result.status_code, 200)
-        self.assertContains(result, "Resumen ejecutivo")
+        self.assertContains(result, "Inicio")
 
         self.client.force_login(self.auditor)
         forbidden = self.client.get(reverse("director_dashboard"))

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% block title %}Bandeja de decisiones | Dirección de Auditoría{% endblock %}
+{% block title %}Solicitudes | Dirección de Auditoría{% endblock %}
 {% block content %}
-<div class="page-heading heading-row"><div><p class="eyebrow">Control directivo</p><h1>Bandeja de decisiones</h1><p>Revise solicitudes de publicación y cierre. Cada resolución requiere una justificación formal.</p></div><a class="button button-secondary" href="{% url 'director_dashboard' %}">Volver al resumen</a></div>
+<div class="page-heading heading-row"><div><p class="eyebrow">Dirección de Auditoría</p><h1>Solicitudes</h1><p>Revise las solicitudes de publicación y cierre de expedientes.</p></div><a class="button button-secondary" href="{% url 'director_dashboard' %}">Volver al inicio</a></div>
 
 <form method="get" class="filter-bar">
     <div class="field"><label for="status">Estado</label><select id="status" name="status">{% for value, label in statuses %}<option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>

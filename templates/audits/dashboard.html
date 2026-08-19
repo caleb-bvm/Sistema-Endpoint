@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Resumen | Auditoría Interna{% endblock %}
+{% block title %}Inicio | Auditoría Interna{% endblock %}
 {% block content %}
 <section class="welcome-panel">
     <div class="welcome-copy">
-        <p class="eyebrow">Sistema de seguimiento</p>
-        <h1>Panel general</h1>
-        <p>{% if user.is_audit_staff %}Consulte el estado general de los expedientes y gestione las respuestas pendientes de revisión.{% else %}Consulte los expedientes asignados y dé seguimiento a las recomendaciones pendientes de su institución.{% endif %}</p>
-        <div class="button-group"><a class="button button-primary" href="{% url 'case_list' %}">Consultar expedientes <span aria-hidden="true">→</span></a>{% if user.role == 'auditor' %}<a class="button button-secondary" href="{% url 'case_create' %}">Nuevo expediente</a>{% endif %}</div>
+        <p class="eyebrow">Auditoría Interna</p>
+        <h1>Inicio</h1>
+        <p>{% if user.is_audit_staff %}Consulte los expedientes y las respuestas pendientes de revisión.{% else %}Consulte sus expedientes y las recomendaciones pendientes.{% endif %}</p>
+        <div class="button-group"><a class="button button-primary" href="{% url 'case_list' %}">Ver expedientes <span aria-hidden="true">→</span></a>{% if user.role == 'auditor' %}<a class="button button-secondary" href="{% url 'case_create' %}">Nuevo expediente</a>{% endif %}</div>
     </div>
     <div class="welcome-visual" aria-hidden="true">
         <span class="visual-ring"></span>
@@ -16,15 +16,15 @@
 </section>
 
 <section class="stats-grid" aria-label="Indicadores">
-    <article class="stat-card stat-primary"><div class="stat-icon" aria-hidden="true">▤</div><div><span>Expedientes asignados</span><strong>{{ total_cases }}</strong><small>según su ámbito de acceso</small></div></article>
-    <article class="stat-card stat-secondary"><div class="stat-icon" aria-hidden="true">◔</div><div><span>Expedientes en seguimiento</span><strong>{{ open_cases }}</strong><small>con gestión vigente</small></div></article>
-    <article class="stat-card stat-tertiary"><div class="stat-icon" aria-hidden="true">!</div><div><span>{% if user.is_audit_staff %}Respuestas por revisar{% else %}Acciones pendientes{% endif %}</span><strong>{{ pending_recommendations }}</strong><small>{% if pending_recommendations %}pendientes de gestión{% else %}sin acciones pendientes{% endif %}</small></div></article>
+    <article class="stat-card stat-primary"><div class="stat-icon" aria-hidden="true">▤</div><div><span>Expedientes</span><strong>{{ total_cases }}</strong><small>asignados</small></div></article>
+    <article class="stat-card stat-secondary"><div class="stat-icon" aria-hidden="true">◔</div><div><span>Expedientes activos</span><strong>{{ open_cases }}</strong><small>en seguimiento</small></div></article>
+    <article class="stat-card stat-tertiary"><div class="stat-icon" aria-hidden="true">!</div><div><span>{% if user.is_audit_staff %}Respuestas por revisar{% else %}Recomendaciones pendientes{% endif %}</span><strong>{{ pending_recommendations }}</strong><small>{% if pending_recommendations %}requieren atención{% else %}ninguna pendiente{% endif %}</small></div></article>
 </section>
 
 <section class="section-block">
     <div class="section-heading">
-        <div><p class="eyebrow">Actividad reciente</p><h2>Expedientes recientes</h2></div>
-        <a class="text-link arrow-link" href="{% url 'case_list' %}">Consultar todos <span aria-hidden="true">→</span></a>
+        <div><p class="eyebrow">Expedientes</p><h2>Últimos expedientes</h2></div>
+        <a class="text-link arrow-link" href="{% url 'case_list' %}">Ver todos <span aria-hidden="true">→</span></a>
     </div>
     <div class="card table-card">
         {% if recent_cases %}
@@ -44,7 +44,7 @@
                 </tbody>
             </table>
         </div>
-        {% else %}<div class="empty-state"><h3>No hay expedientes disponibles</h3><p>Los nuevos informes aparecerán aquí cuando sean asignados.</p></div>{% endif %}
+        {% else %}<div class="empty-state"><h3>No hay expedientes</h3><p>Los expedientes asignados aparecerán aquí.</p></div>{% endif %}
     </div>
 </section>
 {% endblock %}

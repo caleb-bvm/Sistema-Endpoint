@@ -1,20 +1,20 @@
 {% extends "base.html" %}
-{% block title %}Mi historial | {{ organization.name }}{% endblock %}
+{% block title %}Historial | {{ organization.name }}{% endblock %}
 {% block content %}
 <div class="page-heading">
-    <p class="eyebrow">Expediente institucional permanente</p>
-    <h1>Mi historial de auditoría</h1>
+    <p class="eyebrow">Centro educativo</p>
+    <h1>Historial</h1>
     <p>{{ organization.code }} · {{ organization.name }}</p>
 </div>
 
-<section class="stats-grid" aria-label="Resumen histórico">
+<section class="stats-grid" aria-label="Resumen del historial">
     <article class="stat-card stat-primary"><div><span>Expedientes</span><strong>{{ cases.count }}</strong><small>publicados o cerrados</small></div></article>
     <article class="stat-card stat-secondary"><div><span>Documentos</span><strong>{{ documents.count }}</strong><small>disponibles para consulta</small></div></article>
     <article class="stat-card stat-tertiary"><div><span>Recomendaciones</span><strong>{{ recommendation_count }}</strong><small>anteriores y actuales</small></div></article>
 </section>
 
 <section class="section-block">
-    <div class="section-heading"><div><p class="eyebrow">Documentos</p><h2>Informes disponibles</h2></div></div>
+    <div class="section-heading"><div><p class="eyebrow">Documentos</p><h2>Informes</h2></div></div>
     <div class="card table-card"><div class="table-responsive"><table>
         <thead><tr><th>Referencia</th><th>Documento</th><th>Fecha</th><th>Estado</th><th></th></tr></thead>
         <tbody>
@@ -37,7 +37,7 @@
 </section>
 
 <section class="section-block">
-    <div class="section-heading"><div><p class="eyebrow">Antecedentes</p><h2>Recomendaciones históricas</h2></div></div>
+    <div class="section-heading"><div><p class="eyebrow">Informes anteriores</p><h2>Recomendaciones anteriores</h2></div></div>
     {% for recommendation in historical_recommendations %}
     <article class="recommendation-card">
         <div class="recommendation-header">
@@ -50,12 +50,12 @@
         <p><a class="text-link" href="{% url 'historical_document_detail' recommendation.source_document_id %}">Abrir informe de origen</a></p>
     </article>
     {% empty %}
-    <div class="empty-state card"><h2>Sin recomendaciones históricas registradas</h2></div>
+    <div class="empty-state card"><h2>No hay recomendaciones anteriores</h2></div>
     {% endfor %}
 </section>
 
 <section class="section-block">
-    <div class="section-heading"><div><p class="eyebrow">Seguimiento</p><h2>Recomendaciones actuales</h2></div></div>
+    <div class="section-heading"><div><p class="eyebrow">Expedientes actuales</p><h2>Recomendaciones actuales</h2></div></div>
     {% for recommendation in recommendations %}
     <article class="recommendation-card">
         <div class="recommendation-header"><span class="recommendation-number">{{ recommendation.finding.case.reference }} · {{ recommendation.finding.number }}.{{ recommendation.number }}</span><span class="status status-{{ recommendation.status }}">{{ recommendation.get_status_display }}</span></div>
@@ -64,12 +64,12 @@
         <p><a class="text-link" href="{% url 'case_detail' recommendation.finding.case_id %}">Abrir expediente</a></p>
     </article>
     {% empty %}
-    <div class="empty-state card"><h2>Sin recomendaciones actuales</h2></div>
+    <div class="empty-state card"><h2>No hay recomendaciones actuales</h2></div>
     {% endfor %}
 </section>
 
 <section class="section-block">
-    <div class="section-heading"><div><p class="eyebrow">Comunicaciones enviadas</p><h2>Respuestas institucionales</h2></div></div>
+    <div class="section-heading"><div><p class="eyebrow">Respuestas</p><h2>Respuestas enviadas</h2></div></div>
     <div class="card table-card"><div class="table-responsive"><table>
         <thead><tr><th>Expediente</th><th>Versión</th><th>Fecha</th><th>Documentos</th><th></th></tr></thead>
         <tbody>

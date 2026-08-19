@@ -3,7 +3,7 @@ from pathlib import Path
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.core.validators import MinValueValidator
+from django.core.validators import MinValueValidator, RegexValidator
 from django.db import models
 
 from apps.core.validators import validate_evidence_file
@@ -153,9 +153,16 @@ class SchoolBoardMember(models.Model):
     )
     full_name = models.CharField("nombre completo", max_length=255)
     identity_document = models.CharField(
-        "documento de identificación",
-        max_length=80,
+        "DUI (Documento Único de Identidad)",
+        max_length=10,
         blank=True,
+        validators=[
+            RegexValidator(
+                regex=r"^\d{8}-\d$",
+                message="Ingrese el DUI con el formato 00000000-0.",
+                code="invalid_dui_format",
+            )
+        ],
     )
     position = models.CharField("cargo dentro del CDE", max_length=150)
     sector = models.CharField("sector que representa", max_length=20, choices=Sector.choices)

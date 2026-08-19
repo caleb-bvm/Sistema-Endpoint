@@ -113,7 +113,7 @@ class HistoricalDocumentForm(forms.ModelForm):
             "file": forms.ClearableFileInput(attrs={"accept": ".pdf,.docx"}),
         }
         help_texts = {
-            "file": "Se admiten informes históricos en PDF o Word (.docx).",
+            "file": "Se admiten informes anteriores en PDF o Word (.docx).",
         }
 
     def __init__(self, *args, **kwargs):
@@ -126,7 +126,7 @@ class HistoricalDocumentForm(forms.ModelForm):
         document = self.cleaned_data.get("file")
         extension = Path(document.name).suffix.lower() if document else ""
         if extension not in {".pdf", ".docx"}:
-            raise forms.ValidationError("El documento histórico debe ser PDF o Word (.docx).")
+            raise forms.ValidationError("El informe debe ser PDF o Word (.docx).")
         return document
 
 
