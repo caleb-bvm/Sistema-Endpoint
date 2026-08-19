@@ -3,7 +3,12 @@ from .base import *
 
 DEBUG = True
 SECRET_KEY = "solo-desarrollo-no-usar-en-produccion-cambiar-antes-de-publicar"
-ALLOWED_HOSTS = ["127.0.0.1", "localhost", "testserver"]
+ALLOWED_HOSTS = [
+    "127.0.0.1",
+    "localhost",
+    "testserver",
+    *env_list("DJANGO_ALLOWED_HOSTS"),
+]
 
 DATABASES = {
     "default": {
@@ -14,4 +19,3 @@ DATABASES = {
 
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 FILE_SCAN_REQUIRED = False
-

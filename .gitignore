@@ -12,3 +12,5 @@ tmp/
 .idea/
 .vscode/
 
+# Standalone website project with its own Git repository.
+/site/
