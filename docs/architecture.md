@@ -4,6 +4,10 @@
 
 Mantener en un único expediente verificable el informe, los hallazgos, las recomendaciones, las respuestas institucionales, las evidencias y las decisiones de Auditoría Interna.
 
+El expediente funciona además como historial permanente del centro. Los informes anteriores
+se registran como documentos históricos y sus recomendaciones no cumplidas o parcialmente
+cumplidas pueden incorporarse, conservando su procedencia, a un seguimiento posterior.
+
 ## Componentes
 
 - **Django:** autenticación, reglas de acceso, flujo de expedientes, formularios y generación de constancias.
@@ -48,6 +52,23 @@ La publicación y el cierre requieren una decisión de la Dirección de Auditor�
 ## Archivos
 
 Los formatos iniciales permitidos son PDF, JPG, PNG, DOCX y XLSX. La validación comprueba extensión, tamaño, firma básica y estructura interna de los documentos de Office. En producción, `FILE_SCAN_REQUIRED=true` mantiene los archivos sin disponibilidad hasta que el servicio antivirus los marque como aprobados.
+
+Los nuevos informes se elaboran fuera del sistema y se cargan en Word. Cada carga crea una
+versión independiente. La Dirección aprueba o devuelve el informe completo; solamente la
+versión aprobada se publica para la institución. Los PDF y Word anteriores se conservan en el
+repositorio histórico.
+
+Las respuestas institucionales siempre requieren al menos un documento. La validación rechaza
+el envío si no se adjunta ningún archivo. Una institución puede
+consultar sus propias respuestas y evidencias, pero no los archivos privados enviados por otras
+dependencias que participen en el mismo expediente.
+
+## Plazos y conservación
+
+- Toda prórroga conserva la fecha anterior, los días hábiles concedidos, la nueva fecha, el motivo y el usuario que la registró.
+- Los fines de semana y los asuetos activos se excluyen del cálculo.
+- El comando `process_overdue_recommendations` registra como no cumplidas las recomendaciones sin respuesta cuyo plazo vigente ya terminó. Solo procesa expedientes publicados y respeta la prórroga más reciente.
+- Los expedientes publicados no se eliminan. Las correcciones se realizan mediante nuevas versiones y todas las actuaciones quedan en la bitácora.
 
 ## Decisiones pendientes de infraestructura
 

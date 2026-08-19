@@ -11,6 +11,10 @@ Las instituciones y las cuentas representan objetos distintos:
 
 Esta estrategia evita más de mil credenciales inactivas, contraseñas distribuidas anticipadamente y cuentas compartidas difíciles de auditar. También evita que cada auditor tenga que volver a capturar los datos del centro.
 
+## Estado temporal del piloto
+
+La interfaz de Dirección permite buscar centros y activar su acceso con el usuario `centro.<código>`. Durante la validación local, la cuenta activada reutiliza la credencial común de demostración y no exige un cambio inmediato. Este comportamiento es transitorio y debe sustituirse por cuentas nominales y entrega segura de credenciales antes de publicar el sistema.
+
 ## Distribución de responsabilidades
 
 | Actividad | Responsable propuesto |

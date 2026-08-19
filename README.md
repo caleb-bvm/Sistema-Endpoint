@@ -14,7 +14,14 @@ Primera base funcional para registrar expedientes, hallazgos, recomendaciones, r
 - Panel administrativo y panel web para instituciones.
 - Flujo propio para crear borradores, registrar hallazgos y recomendaciones, revisar y publicar expedientes.
 - Perfil de Dirección de Auditoría con resumen ejecutivo, bandeja de decisiones, aprobación de publicaciones y cierres, y reasignación justificada de auditores.
+- Catálogo consultable de centros educativos para Dirección, con búsqueda, estado de acceso, activación y acceso directo a sus expedientes.
 - Importación validada del catálogo institucional desde CSV.
+- Repositorio de informes históricos en PDF y Word.
+- Copia controlada y sin duplicados de recomendaciones no cumplidas o parcialmente cumplidas.
+- Informes Word versionados, con aprobación directiva antes de su publicación.
+- Prórrogas calculadas en días hábiles y calendario configurable de asuetos.
+- Historial permanente de informes, recomendaciones y respuestas por institución.
+- Separación de evidencias para impedir que una institución consulte archivos de otra dependencia.
 
 ## Inicio local en Windows
 
@@ -28,12 +35,33 @@ python -m venv .venv
 
 La primera ejecución de `seed_demo` genera credenciales temporales y las muestra una sola vez en la consola. Las ejecuciones posteriores actualizan los datos de ejemplo, pero conservan esas contraseñas. Para regenerarlas deliberadamente, use `python manage.py seed_demo --reset-passwords`. Solo debe utilizarse en desarrollo local.
 
+El seed deja siete expedientes de demostración: una publicación pendiente de aprobación, tres expedientes publicados listos para respuesta institucional, una respuesta pendiente de revisión, una corrección solicitada y un cierre pendiente. Los documentos Word y las evidencias PDF asociados también se generan localmente.
+
+Dos de los expedientes publicados se basan en los informes `IA/NA-043-2024` del Centro Escolar Florinda B. González (código 10471) e `IA/NA-046-2024` del Complejo Educativo Comunidad 10 de Octubre (código 11489). Ambos centros quedan activos en el catálogo, pero sin usuario institucional, para que la demostración incluya el flujo de activación desde el perfil de Dirección antes de presentar respuestas.
+
 ## Verificaciones
 
 ```powershell
 .\.venv\Scripts\python.exe manage.py check
 .\.venv\Scripts\python.exe manage.py test
 ```
+
+El vencimiento automático se ejecuta con:
+
+```powershell
+.\.venv\Scripts\python.exe manage.py process_overdue_recommendations
+```
+
+En producción, este comando debe programarse para ejecutarse una vez al día. Marca como no
+cumplidas las recomendaciones pendientes o en corrección cuyo plazo vigente ya venció.
+
+### Recordatorio obligatorio para el despliegue
+
+- [ ] Programar `process_overdue_recommendations` para que se ejecute diariamente.
+- [ ] Ejecutarlo manualmente una vez en producción y confirmar que finaliza correctamente.
+- [ ] Verificar que el servidor conserve un registro de cada ejecución y de cualquier error.
+
+El despliegue no debe considerarse terminado hasta completar estas tres comprobaciones.
 
 ## Producción
 
