@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} | {{ organization.name }}{% endblock %}
+{% block content %}
+<div class="page-narrow">
+    <nav class="breadcrumb" aria-label="Ruta"><a href="{% url 'cde_detail' organization.pk %}">Consejo Directivo Escolar</a><span>/</span><span>{{ title }}</span></nav>
+    <div class="page-heading">
+        <p class="eyebrow">{{ eyebrow }}</p>
+        <h1>{{ title }}</h1>
+        <p>{{ organization.name }} · {{ organization.code }}</p>
+    </div>
+    <form method="post" enctype="multipart/form-data" class="stacked-form card">
+        {% csrf_token %}
+        {% if form.non_field_errors %}<div class="form-error">{{ form.non_field_errors }}</div>{% endif %}
+        <p class="muted">{{ intro }}</p>
+        {{ form.as_p }}
+        <div class="submit-panel">
+            <a class="button button-secondary" href="{% url 'cde_detail' organization.pk %}">Cancelar</a>
+            <button class="button button-primary" type="submit">{{ submit_label }}</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

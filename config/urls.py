@@ -17,5 +17,6 @@ urlpatterns = [
     ),
     path("salir/", auth_views.LogoutView.as_view(), name="logout"),
     path("cambiar-contrasena/", RequiredPasswordChangeView.as_view(), name="password_change"),
+    path("cde/", include("apps.institutions.urls")),
     path("", include("apps.audits.urls")),
 ]

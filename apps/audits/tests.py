@@ -13,7 +13,7 @@ from django.urls import reverse
 
 from apps.accounts.models import User
 from apps.core.validators import validate_evidence_file
-from apps.institutions.models import Organization
+from apps.institutions.models import Organization, SchoolBoardPeriod
 
 from .models import (
     ActivityLog,
@@ -508,6 +508,21 @@ class AccessAndWorkflowTests(TestCase):
         self.assertContains(response, "Presentar respuesta")
 
     def test_responsible_organization_can_submit_response_and_evidence(self):
+        cde_period = SchoolBoardPeriod.objects.create(
+            organization=self.center,
+            start_date=date(2026, 1, 1),
+            end_date=date(2027, 12, 31),
+            school_year_start=2026,
+            school_year_end=2027,
+            supporting_document=SimpleUploadedFile(
+                "acta-cde.pdf",
+                b"%PDF-1.4\nacta de prueba",
+                content_type="application/pdf",
+            ),
+            supporting_document_name="acta-cde.pdf",
+            created_by=self.institution_user,
+            updated_by=self.institution_user,
+        )
         self.client.force_login(self.institution_user)
         evidence = SimpleUploadedFile("acta.pdf", b"%PDF-1.4\ncontenido de prueba", content_type="application/pdf")
         response = self.client.post(
@@ -527,6 +542,7 @@ class AccessAndWorkflowTests(TestCase):
         self.assertRedirects(response, reverse("case_detail", args=[self.case.pk]))
         created = Response.objects.get(recommendation=self.recommendation)
         self.assertEqual(created.version, 1)
+        self.assertEqual(created.school_board_period, cde_period)
         self.assertEqual(created.evidence.count(), 1)
         self.recommendation.refresh_from_db()
         self.assertEqual(self.recommendation.status, Recommendation.Status.SUBMITTED)

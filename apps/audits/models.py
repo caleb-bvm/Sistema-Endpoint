@@ -373,6 +373,14 @@ class Response(models.Model):
         on_delete=models.PROTECT,
         related_name="submitted_responses",
     )
+    school_board_period = models.ForeignKey(
+        "institutions.SchoolBoardPeriod",
+        verbose_name="CDE vigente al presentar la respuesta",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="responses",
+    )
     submitted_at = models.DateTimeField("enviada", auto_now_add=True)
 
     class Meta:

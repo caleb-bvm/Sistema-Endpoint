@@ -15,7 +15,7 @@ from django.views.decorators.http import require_POST
 from django.views.generic import ListView, TemplateView
 
 from apps.accounts.models import User
-from apps.institutions.models import Organization
+from apps.institutions.models import Organization, SchoolBoardPeriod
 
 from .forms import (
     AuditCaseForm,
@@ -1274,7 +1274,10 @@ def case_detail(request, pk):
     if not request.user.is_authenticated:
         return redirect(f"/ingresar/?next={request.path}")
     case = get_accessible_case(request.user, pk)
-    visible_responses = Response.objects.select_related("review").prefetch_related("evidence")
+    visible_responses = Response.objects.select_related(
+        "review",
+        "school_board_period__organization",
+    ).prefetch_related("evidence")
     if request.user.role == User.Role.INSTITUTION:
         visible_responses = visible_responses.filter(
             recommendation__responsible_organization_id=request.user.organization_id
@@ -1483,6 +1486,10 @@ def respond_recommendation(request, pk):
             response.recommendation = recommendation
             response.version = latest_version + 1
             response.submitted_by = request.user
+            response.school_board_period = SchoolBoardPeriod.objects.filter(
+                organization=recommendation.responsible_organization,
+                is_current=True,
+            ).first()
             response.save()
 
             for uploaded_file in form.cleaned_data["files"]:
@@ -1516,7 +1523,11 @@ def respond_recommendation(request, pk):
                 "response_submitted",
                 case=case,
                 target=response,
-                details={"recommendation": recommendation.pk, "version": response.version},
+                details={
+                    "recommendation": recommendation.pk,
+                    "version": response.version,
+                    "school_board_period_id": response.school_board_period_id,
+                },
             )
             messages.success(request, "La respuesta fue enviada y quedó registrada en el expediente.")
             return redirect("case_detail", pk=case.pk)

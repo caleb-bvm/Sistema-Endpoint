@@ -71,6 +71,7 @@
             </div>
 
             <footer class="center-card-actions">
+                <a class="button button-secondary" href="{% url 'cde_detail' center.pk %}">Ver CDE</a>
                 <a class="button button-secondary center-cases-button" href="{% url 'case_list' %}?organization={{ center.pk }}">
                     Ver expedientes <span class="button-count">{{ center.case_count }}</span>
                 </a>

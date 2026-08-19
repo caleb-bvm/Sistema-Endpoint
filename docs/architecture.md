@@ -70,6 +70,16 @@ dependencias que participen en el mismo expediente.
 - El comando `process_overdue_recommendations` registra como no cumplidas las recomendaciones sin respuesta cuyo plazo vigente ya terminó. Solo procesa expedientes publicados y respeta la prórroga más reciente.
 - Los expedientes publicados no se eliminan. Las correcciones se realizan mediante nuevas versiones y todas las actuaciones quedan en la bitácora.
 
+## Consejo Directivo Escolar
+
+- Cada centro educativo administra con su cuenta institucional los períodos e integrantes de su Consejo Directivo Escolar (CDE).
+- Cada período conserva sus fechas, años escolares, acta de conformación e integrantes. Solamente un período puede figurar como vigente por centro.
+- Registrar un nuevo CDE finaliza el estado vigente del anterior sin eliminarlo. Las salidas y sustituciones conservan a la persona dentro del período histórico.
+- Auditoría y Dirección consultan esta información, pero no la aprueban ni son responsables de mantenerla.
+- Las correcciones conservan en la bitácora los valores anteriores y nuevos. No existen acciones de eliminación en la interfaz ni en la administración técnica.
+- Los documentos del CDE permanecen en almacenamiento privado y pasan por la misma validación de formato y autorización aplicada al resto de los documentos institucionales.
+- Cada respuesta institucional conserva una referencia al CDE que estaba vigente al presentarla. Un cambio posterior de período no modifica esa referencia histórica.
+
 ## Decisiones pendientes de infraestructura
 
 - Integración con antivirus o sistema de análisis utilizado por el Ministerio.

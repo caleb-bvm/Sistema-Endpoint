@@ -52,7 +52,7 @@ class RecommendationAdmin(NoDeleteAdminMixin, admin.ModelAdmin):
 
 @admin.register(Response)
 class ResponseAdmin(NoDeleteAdminMixin, admin.ModelAdmin):
-    list_display = ("recommendation", "version", "declared_status", "submitted_by", "submitted_at")
+    list_display = ("recommendation", "version", "declared_status", "school_board_period", "submitted_by", "submitted_at")
     list_filter = ("declared_status", "submitted_at")
     readonly_fields = ("submitted_at",)
 
