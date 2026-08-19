@@ -11,10 +11,17 @@
 
 <div class="page-heading heading-row">
     <div><p class="eyebrow">Expediente en borrador · {{ case.reference }}</p><h1>Hallazgos y recomendaciones</h1><p>{{ case.audited_organization.name }} · {{ case.title }}</p></div>
-    <div class="button-group"><a class="button button-secondary" href="{% url 'case_edit' case.pk %}">Editar datos generales</a><a class="button button-primary" href="{% url 'finding_create' case.pk %}">Agregar hallazgo</a></div>
+    <div class="button-group"><a class="button button-secondary" href="{% url 'case_edit' case.pk %}">Editar datos generales</a><a class="button button-secondary" href="{% url 'case_import_recommendations' case.pk %}">Importar históricas</a><a class="button button-primary" href="{% url 'finding_create' case.pk %}">Agregar hallazgo</a></div>
 </div>
 
 <div class="draft-notice"><span aria-hidden="true">i</span><div><strong>Este expediente aún no es visible para las instituciones.</strong><p>Puede editar o eliminar su contenido libremente antes de publicarlo.</p></div></div>
+
+<section class="card document-workspace">
+    <div class="section-heading"><div><p class="eyebrow">Documento para aprobación</p><h2>Versiones del informe Word</h2></div><a class="button button-primary" href="{% url 'case_report_upload' case.pk %}">Cargar informe</a></div>
+    {% for document in documents %}
+    <div class="builder-recommendation"><div class="builder-recommendation-copy"><strong>Versión {{ document.version }} · {{ document.title }}</strong><small>{{ document.reference|default:"Sin referencia" }} · {{ document.get_status_display }} · {{ document.uploaded_at|date:"d/m/Y H:i" }}</small></div><a class="button button-ghost button-compact" href="{% url 'download_audit_document' document.pk %}">Descargar</a></div>
+    {% empty %}<div class="inline-empty"><p>Cargue el informe elaborado en Word antes de solicitar aprobación.</p></div>{% endfor %}
+</section>
 
 <section class="builder-list">
     {% for finding in findings %}
@@ -30,7 +37,7 @@
         <div class="builder-recommendations">
             {% for recommendation in finding.recommendations.all %}
             <div class="builder-recommendation">
-                <div class="builder-recommendation-copy"><span class="recommendation-number">Recomendación {{ finding.number }}.{{ recommendation.number }}</span><p>{{ recommendation.text|truncatechars:260 }}</p><small>{{ recommendation.responsible_organization.name }} · Límite: {{ recommendation.deadline|date:"d/m/Y"|default:"Sin definir" }}</small></div>
+                <div class="builder-recommendation-copy"><span class="recommendation-number">Recomendación {{ finding.number }}.{{ recommendation.number }}</span><p>{{ recommendation.text|truncatechars:260 }}</p><small>{{ recommendation.responsible_organization.name }} · Límite: {{ recommendation.deadline|date:"d/m/Y"|default:"Sin definir" }}{% if recommendation.source_recommendation %} · Importada de {{ recommendation.source_recommendation.source_document.reference }}{% endif %}</small></div>
                 <div class="item-actions">
                     <a class="button button-ghost button-compact" href="{% url 'recommendation_edit' recommendation.pk %}">Editar</a>
                     <form method="post" action="{% url 'recommendation_delete' recommendation.pk %}" onsubmit="return confirm('¿Eliminar esta recomendación?');">{% csrf_token %}<button class="button button-danger-link button-compact" type="submit">Eliminar</button></form>

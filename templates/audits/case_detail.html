@@ -15,7 +15,7 @@
         <div><dt>Fecha límite</dt><dd>{{ case.response_deadline|date:"d/m/Y"|default:"Por definir" }}</dd></div>
     </dl>
 </section>
-{% if case.report_file %}<div class="document-bar"><div><span aria-hidden="true">PDF</span><div><strong>Informe de auditoría</strong><small>Documento oficial asociado al expediente</small></div></div><a class="button button-secondary" href="{% url 'download_report' case.pk %}">Descargar informe</a></div>{% endif %}
+{% for document in documents %}<div class="document-bar"><div><span aria-hidden="true">DOC</span><div><strong>{{ document.title }} · versión {{ document.version }}</strong><small>{{ document.reference|default:"Sin referencia" }} · {{ document.get_status_display }}</small></div></div><a class="button button-secondary" href="{% url 'download_audit_document' document.pk %}">Descargar informe</a></div>{% empty %}{% if case.report_file %}<div class="document-bar"><div><span aria-hidden="true">PDF</span><div><strong>Informe de auditoría heredado</strong><small>Documento oficial asociado al expediente</small></div></div><a class="button button-secondary" href="{% url 'download_report' case.pk %}">Descargar informe</a></div>{% endif %}{% endfor %}
 
 <section class="section-block">
     <div class="section-heading"><div><p class="eyebrow">Contenido del informe</p><h2>Hallazgos y recomendaciones</h2></div></div>
@@ -29,9 +29,12 @@
                 <div class="recommendation-header"><span class="recommendation-number">Recomendación {{ recommendation.number }}</span><span class="status status-{{ recommendation.status }}">{{ recommendation.get_status_display }}</span></div>
                 <p class="recommendation-text">{{ recommendation.text|linebreaksbr }}</p>
                 <dl class="meta-list horizontal"><div><dt>Responsable</dt><dd>{{ recommendation.responsible_organization.name }}</dd></div><div><dt>Fecha límite</dt><dd>{{ recommendation.deadline|date:"d/m/Y"|default:"Por definir" }}</dd></div></dl>
+                {% if recommendation.source_recommendation %}<div class="requirement-box"><strong>Procedencia histórica</strong><p>{{ recommendation.source_recommendation.source_document.reference|default:recommendation.source_recommendation.source_document.title }} · Recomendación {{ recommendation.source_recommendation.number }} · {{ recommendation.source_recommendation.get_status_display }}</p>{% if recommendation.source_recommendation.comments %}<p>{{ recommendation.source_recommendation.comments|linebreaksbr }}</p>{% endif %}</div>{% endif %}
                 {% if recommendation.evidence_requirements %}<div class="requirement-box"><strong>Documentación requerida</strong><p>{{ recommendation.evidence_requirements|linebreaksbr }}</p></div>{% endif %}
+                {% if recommendation.no_response_recorded_at %}<div class="review-result"><strong>Sin respuesta dentro del plazo</strong><p>El sistema registró automáticamente la recomendación como no cumplida el {{ recommendation.no_response_recorded_at|date:"d/m/Y H:i" }}.</p></div>{% endif %}
+                {% if recommendation.deadline_extensions.all %}<details><summary>Consultar historial de prórrogas</summary>{% for extension in recommendation.deadline_extensions.all %}<p><strong>{{ extension.business_days }} día{{ extension.business_days|pluralize }} hábil{{ extension.business_days|pluralize:"es" }}</strong>: {{ extension.previous_deadline|date:"d/m/Y" }} → {{ extension.new_deadline|date:"d/m/Y" }}<br>{{ extension.reason }}<br><small>{{ extension.granted_by.get_full_name|default:extension.granted_by.username }} · {{ extension.granted_at|date:"d/m/Y H:i" }}</small></p>{% endfor %}</details>{% endif %}
 
-                {% for response in recommendation.responses.all %}
+                {% for response in recommendation.visible_responses %}
                 <div class="response-block">
                     <div class="response-title"><strong>Respuesta institucional · versión {{ response.version }}</strong><span>{{ response.submitted_at|date:"d/m/Y H:i" }}</span></div>
                     <p><strong>Estado declarado:</strong> {{ response.get_declared_status_display }}</p>
@@ -42,6 +45,7 @@
                 </div>
                 {% endfor %}
 
+                {% if user.role == 'auditor' or user.role == 'audit_manager' %}{% if recommendation.status == 'pending' or recommendation.status == 'correction_required' %}<a class="button button-secondary" href="{% url 'grant_deadline_extension' recommendation.pk %}">Registrar prórroga</a>{% endif %}{% endif %}
                 {% if user.role == 'institution' and user.organization_id == recommendation.responsible_organization_id and recommendation.status == 'pending' or user.role == 'institution' and user.organization_id == recommendation.responsible_organization_id and recommendation.status == 'correction_required' %}
                 <a class="button button-primary" href="{% url 'respond_recommendation' recommendation.pk %}">{% if recommendation.status == 'correction_required' %}Presentar corrección{% else %}Presentar respuesta{% endif %}</a>
                 {% endif %}

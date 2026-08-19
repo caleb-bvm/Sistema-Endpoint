@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Centros educativos | Dirección de Auditoría{% endblock %}
+{% block content %}
+<div class="center-directory">
+    <div class="page-heading heading-row">
+        <div>
+            <p class="eyebrow">Acceso institucional</p>
+            <h1>Centros educativos</h1>
+            <p>Localice un centro, consulte sus expedientes y verifique si ya tiene acceso al sistema.</p>
+        </div>
+        <a class="button button-secondary" href="{% url 'director_dashboard' %}">Volver al resumen</a>
+    </div>
+
+    <section class="executive-stats center-access-stats" aria-label="Resumen de centros educativos">
+        <article class="executive-stat"><span>Centros registrados</span><strong>{{ total_centers }}</strong><small>en el catálogo institucional</small></article>
+        <article class="executive-stat executive-stat-success"><span>Con acceso</span><strong>{{ active_centers }}</strong><small>con usuario institucional activo</small></article>
+        <article class="executive-stat executive-stat-attention"><span>Sin acceso</span><strong>{{ pending_centers }}</strong><small>pendientes de activación</small></article>
+    </section>
+
+    <form method="get" class="filter-bar center-filter-bar" role="search">
+        <div class="field grow search-field">
+            <label for="q">Buscar centro</label>
+            <input id="q" name="q" value="{{ query }}" placeholder="Código, nombre, departamento o municipio">
+        </div>
+        <div class="field center-access-filter">
+            <label for="access">Estado de acceso</label>
+            <select id="access" name="access">
+                <option value="" {% if not selected_access %}selected{% endif %}>Todos</option>
+                <option value="active" {% if selected_access == 'active' %}selected{% endif %}>Con acceso</option>
+                <option value="pending" {% if selected_access == 'pending' %}selected{% endif %}>Sin acceso</option>
+            </select>
+        </div>
+        <button class="button button-tonal" type="submit">Buscar</button>
+    </form>
+
+    <section class="center-directory-grid" aria-label="Directorio de centros educativos">
+        {% for center in centers %}
+        <article class="center-directory-card">
+            <header class="center-card-header">
+                <div class="center-card-title">
+                    <span class="center-code">{{ center.code }}</span>
+                    <h2>{{ center.name }}</h2>
+                    <p>{{ center.municipality|default:"Municipio no registrado" }}{% if center.department %} · {{ center.department }}{% endif %}</p>
+                </div>
+                <div class="center-card-status">
+                    {% if center.active_user_count %}
+                        <span class="status status-approved">Con acceso</span>
+                    {% else %}
+                        <span class="status status-pending">Sin acceso</span>
+                    {% endif %}
+                    {% if not center.is_active %}<small>Inactivo en el catálogo</small>{% endif %}
+                </div>
+            </header>
+
+            <div class="center-card-details">
+                <div class="center-detail">
+                    <span>Usuario institucional</span>
+                    {% if center.institutional_accounts %}
+                        <strong>{{ center.institutional_accounts.0.username }}</strong>
+                        <small>{{ center.institutional_user_count }} cuenta{{ center.institutional_user_count|pluralize }} registrada{{ center.institutional_user_count|pluralize }}</small>
+                    {% else %}
+                        <strong>Sin usuario asignado</strong>
+                        <small>Active el centro para crear su acceso.</small>
+                    {% endif %}
+                </div>
+                <div class="center-detail center-case-summary">
+                    <span>Expedientes</span>
+                    <strong>{{ center.case_count }}</strong>
+                    <small>asociado{{ center.case_count|pluralize }} al centro</small>
+                </div>
+            </div>
+
+            <footer class="center-card-actions">
+                <a class="button button-secondary center-cases-button" href="{% url 'case_list' %}?organization={{ center.pk }}">
+                    Ver expedientes <span class="button-count">{{ center.case_count }}</span>
+                </a>
+                {% if not center.active_user_count %}
+                <form method="post" action="{% url 'director_activate_educational_center' center.pk %}" onsubmit="return confirm('¿Activar el acceso para {{ center.name|escapejs }}?');">
+                    {% csrf_token %}
+                    <button class="button button-primary center-action-button" type="submit">{% if center.institutional_user_count %}Reactivar acceso{% else %}Activar centro{% endif %}</button>
+                </form>
+                {% endif %}
+            </footer>
+        </article>
+        {% empty %}
+        <div class="empty-state card center-directory-empty"><h2>No se encontraron centros</h2><p>Pruebe con otro nombre, código o ubicación.</p></div>
+        {% endfor %}
+    </section>
+
+    {% if is_paginated %}
+    <nav class="pagination" aria-label="Paginación">
+        {% if page_obj.has_previous %}<a href="?q={{ query|urlencode }}&amp;access={{ selected_access|urlencode }}&amp;page={{ page_obj.previous_page_number }}">Anterior</a>{% endif %}
+        <span>Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}<a href="?q={{ query|urlencode }}&amp;access={{ selected_access|urlencode }}&amp;page={{ page_obj.next_page_number }}">Siguiente</a>{% endif %}
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

@@ -21,7 +21,7 @@
     </section>
 
     <section class="card executive-panel">
-        <div class="section-heading"><div><p class="eyebrow">Acceso institucional</p><h2>Centros sin usuario</h2></div><span class="panel-count">{{ centers_without_users_count }}</span></div>
+        <div class="section-heading"><div><p class="eyebrow">Acceso institucional</p><h2>Centros sin usuario</h2></div><a class="text-link" href="{% url 'director_educational_centers' %}?access=pending">Gestionar {{ centers_without_users_count }}</a></div>
         {% if centers_without_users %}<ul class="plain-list">{% for organization in centers_without_users %}<li><div><strong>{{ organization.name }}</strong><small>{{ organization.code }}{% if organization.department %} · {{ organization.department }}{% endif %}</small></div><span class="status-dot status-dot-warning" title="Sin usuario activo"></span></li>{% endfor %}</ul><p class="panel-note">Estos centros tienen recomendaciones vigentes, pero ningún responsable institucional activo.</p>{% else %}<div class="compact-empty"><strong>Cobertura completa</strong><p>Las instituciones con recomendaciones vigentes tienen al menos un usuario activo.</p></div>{% endif %}
     </section>
 

@@ -16,6 +16,12 @@ def private_upload_path(instance, filename):
     return f"expedientes/{case_id or 'pendiente'}/{uuid.uuid4().hex}{extension}"
 
 
+def audit_document_upload_path(instance, filename):
+    extension = Path(filename).suffix.lower()
+    location = f"expediente-{instance.case_id}" if instance.case_id else f"institucion-{instance.organization_id}"
+    return f"documentos/{location}/{uuid.uuid4().hex}{extension}"
+
+
 class AuditCase(models.Model):
     class Status(models.TextChoices):
         DRAFT = "draft", "Borrador"
@@ -70,6 +76,141 @@ class AuditCase(models.Model):
         return f"{self.reference} - {self.audited_organization.name}"
 
 
+class AuditDocument(models.Model):
+    class DocumentType(models.TextChoices):
+        HISTORICAL_REPORT = "historical_report", "Informe histórico"
+        REPORT = "report", "Informe del expediente"
+        NOTIFICATION = "notification", "Notificación"
+        OTHER = "other", "Otro documento"
+
+    class Status(models.TextChoices):
+        HISTORICAL = "historical", "Histórico"
+        DRAFT = "draft", "Borrador"
+        PENDING_APPROVAL = "pending_approval", "Pendiente de aprobación"
+        APPROVED = "approved", "Aprobado"
+        RETURNED = "returned", "Devuelto"
+
+    class Visibility(models.TextChoices):
+        AUDIT_ONLY = "audit_only", "Solo Auditoría"
+        INSTITUTION = "institution", "Visible para la institución"
+
+    case = models.ForeignKey(
+        AuditCase,
+        verbose_name="expediente",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="documents",
+    )
+    organization = models.ForeignKey(
+        "institutions.Organization",
+        verbose_name="institución",
+        on_delete=models.PROTECT,
+        related_name="audit_documents",
+    )
+    document_type = models.CharField(
+        "tipo de documento",
+        max_length=30,
+        choices=DocumentType.choices,
+    )
+    reference = models.CharField("referencia", max_length=80, blank=True)
+    title = models.CharField("título", max_length=300)
+    document_date = models.DateField("fecha del documento", null=True, blank=True)
+    version = models.PositiveIntegerField("versión", default=1, validators=[MinValueValidator(1)])
+    status = models.CharField("estado", max_length=24, choices=Status.choices)
+    visibility = models.CharField(
+        "visibilidad",
+        max_length=20,
+        choices=Visibility.choices,
+        default=Visibility.AUDIT_ONLY,
+    )
+    file = models.FileField(
+        "archivo",
+        upload_to=audit_document_upload_path,
+        validators=[validate_evidence_file],
+    )
+    original_filename = models.CharField("nombre original", max_length=255)
+    size = models.PositiveBigIntegerField("tamaño", default=0)
+    sha256 = models.CharField("huella SHA-256", max_length=64)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="cargado por",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="uploaded_audit_documents",
+    )
+    uploaded_at = models.DateTimeField("cargado", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "documento de auditoría"
+        verbose_name_plural = "documentos de auditoría"
+        ordering = ("-document_date", "-uploaded_at")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("case", "document_type", "version"),
+                condition=models.Q(case__isnull=False),
+                name="unique_document_version_per_case_and_type",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.reference or self.title} / v{self.version}"
+
+
+class HistoricalRecommendation(models.Model):
+    class Status(models.TextChoices):
+        PARTIAL = "partial", "Parcialmente cumplida"
+        NOT_COMPLIED = "not_complied", "No cumplida"
+
+    source_document = models.ForeignKey(
+        AuditDocument,
+        verbose_name="informe de origen",
+        on_delete=models.PROTECT,
+        related_name="historical_recommendations",
+        limit_choices_to={"document_type": AuditDocument.DocumentType.HISTORICAL_REPORT},
+    )
+    number = models.CharField("número o literal", max_length=60)
+    text = models.TextField("recomendación")
+    responsible_organization = models.ForeignKey(
+        "institutions.Organization",
+        verbose_name="institución responsable",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="historical_recommendations",
+    )
+    responsible_description = models.CharField(
+        "responsable indicado en el informe",
+        max_length=300,
+        blank=True,
+    )
+    status = models.CharField("estado anterior", max_length=20, choices=Status.choices)
+    comments = models.TextField("comentario anterior", blank=True)
+    original_deadline = models.DateField("fecha límite original", null=True, blank=True)
+    recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="registrada por",
+        on_delete=models.PROTECT,
+        related_name="recorded_historical_recommendations",
+    )
+    recorded_at = models.DateTimeField("registrada", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "recomendación histórica"
+        verbose_name_plural = "recomendaciones históricas"
+        ordering = ("source_document__document_date", "number")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("source_document", "number"),
+                name="unique_historical_recommendation_number_per_document",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.source_document.reference or self.source_document.title} / {self.number}"
+
+
 class Finding(models.Model):
     class RiskLevel(models.TextChoices):
         LOW = "low", "Bajo"
@@ -120,6 +261,27 @@ class Recommendation(models.Model):
     deadline = models.DateField("fecha límite", null=True, blank=True)
     evidence_requirements = models.TextField("evidencias requeridas", blank=True)
     status = models.CharField("estado", max_length=30, choices=Status.choices, default=Status.PENDING)
+    source_recommendation = models.ForeignKey(
+        HistoricalRecommendation,
+        verbose_name="recomendación histórica de origen",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="follow_up_recommendations",
+    )
+    carried_from = models.ForeignKey(
+        "self",
+        verbose_name="recomendación anterior",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="carried_forward_recommendations",
+    )
+    no_response_recorded_at = models.DateTimeField(
+        "incumplimiento automático registrado",
+        null=True,
+        blank=True,
+    )
 
     class Meta:
         verbose_name = "recomendación"
@@ -133,6 +295,56 @@ class Recommendation(models.Model):
 
     def __str__(self):
         return f"{self.finding.case.reference} / H{self.finding.number} / R{self.number}"
+
+    @property
+    def effective_deadline(self):
+        latest_extension = self.deadline_extensions.order_by("-granted_at", "-pk").first()
+        return latest_extension.new_deadline if latest_extension else self.deadline
+
+
+class BusinessDayHoliday(models.Model):
+    date = models.DateField("fecha", unique=True)
+    name = models.CharField("nombre", max_length=160)
+    is_active = models.BooleanField("activo", default=True)
+
+    class Meta:
+        verbose_name = "asueto"
+        verbose_name_plural = "asuetos"
+        ordering = ("date",)
+
+    def __str__(self):
+        return f"{self.date:%d/%m/%Y} - {self.name}"
+
+
+class DeadlineExtension(models.Model):
+    recommendation = models.ForeignKey(
+        Recommendation,
+        verbose_name="recomendación",
+        on_delete=models.PROTECT,
+        related_name="deadline_extensions",
+    )
+    previous_deadline = models.DateField("fecha límite anterior")
+    business_days = models.PositiveIntegerField(
+        "días hábiles concedidos",
+        validators=[MinValueValidator(1)],
+    )
+    new_deadline = models.DateField("nueva fecha límite")
+    reason = models.TextField("motivo")
+    granted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="registrada por",
+        on_delete=models.PROTECT,
+        related_name="granted_deadline_extensions",
+    )
+    granted_at = models.DateTimeField("registrada", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "prórroga"
+        verbose_name_plural = "prórrogas"
+        ordering = ("granted_at",)
+
+    def __str__(self):
+        return f"{self.recommendation} hasta {self.new_deadline:%d/%m/%Y}"
 
 
 class Response(models.Model):
@@ -293,6 +505,14 @@ class CaseDecision(models.Model):
         AuditCase,
         verbose_name="expediente",
         on_delete=models.PROTECT,
+        related_name="decisions",
+    )
+    document = models.ForeignKey(
+        AuditDocument,
+        verbose_name="documento sometido",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
         related_name="decisions",
     )
     kind = models.CharField("tipo de decisión", max_length=20, choices=Kind.choices)

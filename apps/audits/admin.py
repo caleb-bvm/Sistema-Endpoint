@@ -3,22 +3,32 @@ from django.contrib import admin
 from .models import (
     ActivityLog,
     AuditCase,
+    AuditDocument,
+    BusinessDayHoliday,
     CaseDecision,
+    DeadlineExtension,
     Evidence,
     Finding,
+    HistoricalRecommendation,
     Recommendation,
     Response,
     Review,
 )
 
 
+class NoDeleteAdminMixin:
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
 class RecommendationInline(admin.StackedInline):
     model = Recommendation
     extra = 0
+    can_delete = False
 
 
 @admin.register(AuditCase)
-class AuditCaseAdmin(admin.ModelAdmin):
+class AuditCaseAdmin(NoDeleteAdminMixin, admin.ModelAdmin):
     list_display = ("reference", "audited_organization", "status", "assigned_auditor", "response_deadline")
     list_filter = ("status", "audited_organization__department")
     search_fields = ("reference", "title", "audited_organization__name", "audited_organization__code")
@@ -26,7 +36,7 @@ class AuditCaseAdmin(admin.ModelAdmin):
 
 
 @admin.register(Finding)
-class FindingAdmin(admin.ModelAdmin):
+class FindingAdmin(NoDeleteAdminMixin, admin.ModelAdmin):
     list_display = ("case", "number", "title", "risk_level")
     list_filter = ("risk_level",)
     search_fields = ("case__reference", "title")
@@ -34,21 +44,21 @@ class FindingAdmin(admin.ModelAdmin):
 
 
 @admin.register(Recommendation)
-class RecommendationAdmin(admin.ModelAdmin):
+class RecommendationAdmin(NoDeleteAdminMixin, admin.ModelAdmin):
     list_display = ("__str__", "responsible_organization", "deadline", "status")
     list_filter = ("status", "deadline", "responsible_organization__kind")
     search_fields = ("finding__case__reference", "text", "responsible_organization__name")
 
 
 @admin.register(Response)
-class ResponseAdmin(admin.ModelAdmin):
+class ResponseAdmin(NoDeleteAdminMixin, admin.ModelAdmin):
     list_display = ("recommendation", "version", "declared_status", "submitted_by", "submitted_at")
     list_filter = ("declared_status", "submitted_at")
     readonly_fields = ("submitted_at",)
 
 
 @admin.register(Evidence)
-class EvidenceAdmin(admin.ModelAdmin):
+class EvidenceAdmin(NoDeleteAdminMixin, admin.ModelAdmin):
     list_display = ("original_filename", "response", "category", "scan_status", "uploaded_at")
     list_filter = ("scan_status", "category")
     search_fields = ("original_filename", "description", "sha256")
@@ -56,7 +66,7 @@ class EvidenceAdmin(admin.ModelAdmin):
 
 
 @admin.register(Review)
-class ReviewAdmin(admin.ModelAdmin):
+class ReviewAdmin(NoDeleteAdminMixin, admin.ModelAdmin):
     list_display = ("response", "outcome", "reviewed_by", "reviewed_at")
     list_filter = ("outcome",)
     readonly_fields = ("reviewed_at",)
@@ -114,3 +124,61 @@ class CaseDecisionAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(AuditDocument)
+class AuditDocumentAdmin(NoDeleteAdminMixin, admin.ModelAdmin):
+    list_display = (
+        "reference",
+        "title",
+        "organization",
+        "document_type",
+        "version",
+        "status",
+        "uploaded_at",
+    )
+    list_filter = ("document_type", "status", "visibility", "organization__kind")
+    search_fields = ("reference", "title", "organization__name", "original_filename")
+    readonly_fields = ("original_filename", "size", "sha256", "uploaded_by", "uploaded_at")
+
+
+@admin.register(HistoricalRecommendation)
+class HistoricalRecommendationAdmin(NoDeleteAdminMixin, admin.ModelAdmin):
+    list_display = ("source_document", "number", "responsible_organization", "status")
+    list_filter = ("status", "source_document__organization")
+    search_fields = ("source_document__reference", "text", "responsible_description")
+    readonly_fields = ("recorded_by", "recorded_at")
+
+
+@admin.register(DeadlineExtension)
+class DeadlineExtensionAdmin(NoDeleteAdminMixin, admin.ModelAdmin):
+    list_display = (
+        "recommendation",
+        "previous_deadline",
+        "new_deadline",
+        "business_days",
+        "granted_by",
+        "granted_at",
+    )
+    readonly_fields = (
+        "recommendation",
+        "previous_deadline",
+        "business_days",
+        "new_deadline",
+        "reason",
+        "granted_by",
+        "granted_at",
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(BusinessDayHoliday)
+class BusinessDayHolidayAdmin(admin.ModelAdmin):
+    list_display = ("date", "name", "is_active")
+    list_filter = ("is_active",)
+    search_fields = ("name",)

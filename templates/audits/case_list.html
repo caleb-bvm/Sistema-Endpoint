@@ -2,10 +2,18 @@
 {% block title %}Expedientes | Auditoría Interna{% endblock %}
 {% block content %}
 <div class="page-heading heading-row">
+    {% if selected_organization %}
+    <div><p class="eyebrow">Expedientes del centro</p><h1>{{ selected_organization.name }}</h1><p>Código {{ selected_organization.code }}{% if selected_organization.municipality %} · {{ selected_organization.municipality }}{% endif %}{% if selected_organization.department %} · {{ selected_organization.department }}{% endif %}</p></div>
+    {% else %}
     <div><p class="eyebrow">Gestión de auditoría</p><h1>Expedientes</h1><p>Consulte los informes de auditoría, las recomendaciones emitidas, las respuestas institucionales y los resultados de revisión.</p></div>
-    {% if user.role == 'auditor' %}<a class="button button-primary" href="{% url 'case_create' %}">+ Nuevo expediente</a>{% endif %}
+    {% endif %}
+    <div class="heading-actions">
+        {% if selected_organization and user.role == 'audit_manager' %}<a class="button button-secondary" href="{% url 'director_educational_centers' %}">Volver a centros</a>{% endif %}
+        {% if user.role == 'auditor' %}<a class="button button-primary" href="{% url 'case_create' %}">+ Nuevo expediente</a>{% endif %}
+    </div>
 </div>
 <form method="get" class="filter-bar" role="search">
+    {% if selected_organization_id %}<input type="hidden" name="organization" value="{{ selected_organization_id }}">{% endif %}
     <div class="field grow search-field"><label for="q">Criterio de búsqueda</label><div class="input-with-icon"><span aria-hidden="true">⌕</span><input id="q" name="q" value="{{ request.GET.q }}" placeholder="Ingrese referencia, institución o código"></div></div>
     <div class="field"><label for="status">Estado</label><select id="status" name="status"><option value="">Todos</option>{% for value, label in statuses %}<option value="{{ value }}" {% if request.GET.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
     <button class="button button-tonal" type="submit">Filtrar resultados</button>
@@ -20,7 +28,7 @@
         <dl class="meta-list"><div><dt>Código</dt><dd>{{ case.audited_organization.code }}</dd></div><div><dt>Fecha límite</dt><dd>{{ case.response_deadline|date:"d/m/Y"|default:"Por definir" }}</dd></div></dl>
         <a class="button button-tonal button-block" href="{% url 'case_detail' case.pk %}">Ver expediente <span aria-hidden="true">→</span></a>
     </article>
-    {% empty %}<div class="empty-state card"><h2>No se encontraron expedientes</h2><p>Pruebe con otros criterios de búsqueda.</p></div>{% endfor %}
+    {% empty %}<div class="empty-state card"><h2>{% if invalid_organization_filter %}No se encontró el centro educativo{% else %}No se encontraron expedientes{% endif %}</h2><p>{% if invalid_organization_filter %}El enlace no identifica un centro válido. Regrese al directorio para seleccionar uno.{% else %}Pruebe con otros criterios de búsqueda.{% endif %}</p>{% if invalid_organization_filter and user.role == 'audit_manager' %}<a class="button button-secondary" href="{% url 'director_educational_centers' %}">Volver a centros</a>{% endif %}</div>{% endfor %}
 </div>
-{% if is_paginated %}<nav class="pagination" aria-label="Paginación">{% if page_obj.has_previous %}<a href="?page={{ page_obj.previous_page_number }}">Anterior</a>{% endif %}<span>Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>{% if page_obj.has_next %}<a href="?page={{ page_obj.next_page_number }}">Siguiente</a>{% endif %}</nav>{% endif %}
+{% if is_paginated %}<nav class="pagination" aria-label="Paginación">{% if page_obj.has_previous %}<a href="?organization={{ selected_organization_id|urlencode }}&amp;q={{ request.GET.q|urlencode }}&amp;status={{ request.GET.status|urlencode }}&amp;page={{ page_obj.previous_page_number }}">Anterior</a>{% endif %}<span>Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>{% if page_obj.has_next %}<a href="?organization={{ selected_organization_id|urlencode }}&amp;q={{ request.GET.q|urlencode }}&amp;status={{ request.GET.status|urlencode }}&amp;page={{ page_obj.next_page_number }}">Siguiente</a>{% endif %}</nav>{% endif %}
 {% endblock %}

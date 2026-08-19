@@ -7,6 +7,7 @@
 <section class="decision-context card">
     <dl class="summary-grid"><div><dt>Solicitada por</dt><dd>{{ decision.requested_by.get_full_name|default:decision.requested_by.username }}</dd></div><div><dt>Fecha de solicitud</dt><dd>{{ decision.requested_at|date:"d/m/Y H:i" }}</dd></div><div><dt>Auditor responsable</dt><dd>{{ case.assigned_auditor.get_full_name|default:case.assigned_auditor.username }}</dd></div><div><dt>Fecha límite</dt><dd>{{ case.response_deadline|date:"d/m/Y"|default:"Sin definir" }}</dd></div></dl>
     {% if decision.request_note %}<div class="request-note"><strong>Fundamento de la solicitud</strong><p>{{ decision.request_note|linebreaksbr }}</p></div>{% endif %}
+    {% if decision.document %}<div class="document-bar"><div><span aria-hidden="true">DOC</span><div><strong>{{ decision.document.title }} · versión {{ decision.document.version }}</strong><small>{{ decision.document.original_filename }}</small></div></div><a class="button button-secondary" href="{% url 'download_audit_document' decision.document.pk %}">Revisar documento</a></div>{% endif %}
 </section>
 
 <section class="section-block">

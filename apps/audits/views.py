@@ -1,14 +1,16 @@
 import hashlib
+from pathlib import Path
 
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
-from django.db.models import Count, Exists, Max, OuterRef, Q
+from django.db.models import Count, Exists, Max, OuterRef, Prefetch, Q
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.utils.text import slugify
 from django.views.decorators.http import require_POST
 from django.views.generic import ListView, TemplateView
 
@@ -18,9 +20,14 @@ from apps.institutions.models import Organization
 from .forms import (
     AuditCaseForm,
     AuditorReassignmentForm,
+    CaseReportDocumentForm,
     ClosureRequestForm,
+    DeadlineExtensionForm,
     DecisionResolutionForm,
     FindingForm,
+    HistoricalDocumentForm,
+    HistoricalRecommendationForm,
+    HistoricalRecommendationImportForm,
     RecommendationForm,
     ResponseForm,
     ReviewForm,
@@ -28,14 +35,23 @@ from .forms import (
 from .models import (
     ActivityLog,
     AuditCase,
+    AuditDocument,
     CaseDecision,
+    DeadlineExtension,
     Evidence,
     Finding,
+    HistoricalRecommendation,
     Recommendation,
     Response,
     Review,
 )
 from .pdf import build_response_receipt
+from .services import (
+    add_business_days,
+    copy_historical_recommendations,
+    create_audit_document,
+    next_document_version,
+)
 
 
 def get_client_ip(request):
@@ -63,10 +79,61 @@ def user_is_director(user):
     return user.is_authenticated and user.role == User.Role.AUDIT_MANAGER
 
 
+def institutional_username(organization):
+    """Build a stable, unique username from the official center code."""
+    identifier = slugify(organization.code) or str(organization.pk)
+    base_username = f"centro.{identifier}"[:150]
+    username = base_username
+    suffix = 2
+    while User.objects.filter(username=username).exists():
+        suffix_text = f".{suffix}"
+        username = f"{base_username[:150 - len(suffix_text)]}{suffix_text}"
+        suffix += 1
+    return username
+
+
 def user_can_edit_case(user, case):
     if not user.is_authenticated or case.status != AuditCase.Status.DRAFT:
         return False
     return user.role == User.Role.AUDITOR and case.assigned_auditor_id == user.pk
+
+
+def user_can_access_response(user, response):
+    case = response.recommendation.finding.case
+    if user.is_superuser or user.role in {
+        User.Role.TECHNICAL_ADMIN,
+        User.Role.AUDIT_MANAGER,
+    }:
+        return True
+    if user.role == User.Role.AUDITOR:
+        return case.assigned_auditor_id == user.pk
+    return bool(
+        user.role == User.Role.INSTITUTION
+        and user.organization_id
+        and response.recommendation.responsible_organization_id == user.organization_id
+    )
+
+
+def user_can_access_document(user, document):
+    if user.is_superuser or user.role in {
+        User.Role.TECHNICAL_ADMIN,
+        User.Role.AUDIT_MANAGER,
+    }:
+        return True
+    if user.role == User.Role.AUDITOR:
+        return bool(
+            document.document_type == AuditDocument.DocumentType.HISTORICAL_REPORT
+            or (document.case and document.case.assigned_auditor_id == user.pk)
+        )
+    return bool(
+        user.role == User.Role.INSTITUTION
+        and user.organization_id == document.organization_id
+        and document.visibility == AuditDocument.Visibility.INSTITUTION
+        and document.status in {
+            AuditDocument.Status.HISTORICAL,
+            AuditDocument.Status.APPROVED,
+        }
+    )
 
 
 def get_editable_case(user, pk):
@@ -82,8 +149,17 @@ def get_editable_case(user, pk):
 def publication_issues(case):
     findings = list(case.findings.prefetch_related("recommendations"))
     issues = []
-    if not case.report_file:
-        issues.append("Adjunte el informe final en formato PDF.")
+    report_document = case.documents.filter(
+        document_type=AuditDocument.DocumentType.REPORT,
+        status__in=[
+            AuditDocument.Status.DRAFT,
+            AuditDocument.Status.PENDING_APPROVAL,
+        ],
+    ).order_by("-version").first()
+    if not report_document:
+        issues.append("Cargue el informe elaborado en Word antes de solicitar su aprobación.")
+    elif Path(report_document.original_filename or report_document.file.name).suffix.lower() != ".docx":
+        issues.append("La versión que se someterá a aprobación debe estar en formato Word (.docx).")
     if not case.report_date:
         issues.append("Indique la fecha oficial del informe.")
     if not case.response_deadline:
@@ -173,6 +249,51 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         else:
             context["pending_recommendations"] = 0
         return context
+
+
+def institution_history(request):
+    if not request.user.is_authenticated:
+        return redirect(f"/ingresar/?next={request.path}")
+    if request.user.role != User.Role.INSTITUTION or not request.user.organization_id:
+        raise PermissionDenied("Esta sección corresponde a las instituciones responsables.")
+    organization = request.user.organization
+    cases = accessible_cases(request.user).exclude(
+        status__in=[AuditCase.Status.DRAFT, AuditCase.Status.PENDING_PUBLICATION]
+    )
+    documents = AuditDocument.objects.filter(
+        organization=organization,
+        visibility=AuditDocument.Visibility.INSTITUTION,
+        status__in=[AuditDocument.Status.HISTORICAL, AuditDocument.Status.APPROVED],
+    ).select_related("case")
+    recommendations = Recommendation.objects.filter(
+        Q(finding__case__audited_organization=organization)
+        | Q(responsible_organization=organization),
+        finding__case__in=cases,
+    ).select_related("finding__case", "responsible_organization").distinct()
+    responses = Response.objects.filter(
+        recommendation__responsible_organization=organization,
+        recommendation__finding__case__in=cases,
+    ).select_related("recommendation__finding__case").prefetch_related("evidence")
+    historical_recommendations = HistoricalRecommendation.objects.filter(
+        source_document__organization=organization,
+        source_document__visibility=AuditDocument.Visibility.INSTITUTION,
+        source_document__status=AuditDocument.Status.HISTORICAL,
+    ).select_related("source_document", "responsible_organization")
+    return render(
+        request,
+        "audits/institution_history.html",
+        {
+            "organization": organization,
+            "cases": cases,
+            "documents": documents,
+            "recommendations": recommendations,
+            "historical_recommendations": historical_recommendations,
+            "recommendation_count": (
+                recommendations.count() + historical_recommendations.count()
+            ),
+            "responses": responses,
+        },
+    )
 
 
 class DirectorDashboardView(LoginRequiredMixin, TemplateView):
@@ -274,6 +395,146 @@ class DirectorDashboardView(LoginRequiredMixin, TemplateView):
         return context
 
 
+class DirectorEducationalCenterListView(LoginRequiredMixin, ListView):
+    template_name = "audits/director_educational_center_list.html"
+    context_object_name = "centers"
+    paginate_by = 25
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+        if not user_is_director(request.user):
+            raise PermissionDenied("Esta sección es exclusiva de la Dirección de Auditoría.")
+        return super().dispatch(request, *args, **kwargs)
+
+    @staticmethod
+    def center_queryset():
+        institutional_accounts = User.objects.filter(
+            role=User.Role.INSTITUTION
+        ).order_by("-is_active", "username")
+        return (
+            Organization.objects.filter(kind=Organization.Kind.EDUCATIONAL_CENTER)
+            .annotate(
+                active_user_count=Count(
+                    "users",
+                    filter=Q(users__role=User.Role.INSTITUTION, users__is_active=True),
+                    distinct=True,
+                ),
+                institutional_user_count=Count(
+                    "users",
+                    filter=Q(users__role=User.Role.INSTITUTION),
+                    distinct=True,
+                ),
+                case_count=Count("audit_cases", distinct=True),
+            )
+            .prefetch_related(
+                Prefetch("users", queryset=institutional_accounts, to_attr="institutional_accounts")
+            )
+        )
+
+    def get_queryset(self):
+        queryset = self.center_queryset()
+        query = self.request.GET.get("q", "").strip()
+        access = self.request.GET.get("access", "")
+        if query:
+            queryset = queryset.filter(
+                Q(code__icontains=query)
+                | Q(name__icontains=query)
+                | Q(department__icontains=query)
+                | Q(municipality__icontains=query)
+            )
+        if access == "active":
+            queryset = queryset.filter(active_user_count__gt=0)
+        elif access == "pending":
+            queryset = queryset.filter(active_user_count=0)
+        return queryset.order_by("name")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        all_centers = self.center_queryset()
+        context.update(
+            {
+                "query": self.request.GET.get("q", "").strip(),
+                "selected_access": self.request.GET.get("access", ""),
+                "total_centers": all_centers.count(),
+                "active_centers": all_centers.filter(active_user_count__gt=0).count(),
+                "pending_centers": all_centers.filter(active_user_count=0).count(),
+            }
+        )
+        return context
+
+
+@require_POST
+def director_activate_educational_center(request, pk):
+    if not user_is_director(request.user):
+        raise PermissionDenied("Esta acción es exclusiva de la Dirección de Auditoría.")
+    if not request.user.has_usable_password():
+        messages.error(request, "No fue posible asignar la credencial inicial al centro.")
+        return redirect("director_educational_centers")
+
+    with transaction.atomic():
+        center = get_object_or_404(
+            Organization.objects.select_for_update(),
+            pk=pk,
+            kind=Organization.Kind.EDUCATIONAL_CENTER,
+        )
+        accounts = User.objects.select_for_update().filter(
+            organization=center,
+            role=User.Role.INSTITUTION,
+        )
+        active_account = accounts.filter(is_active=True).order_by("username").first()
+        if active_account:
+            messages.info(
+                request,
+                f"{center.name} ya tiene acceso activo con el usuario {active_account.username}.",
+            )
+            return redirect("director_educational_centers")
+
+        account = accounts.order_by("username").first()
+        created = account is None
+        if created:
+            account = User(
+                username=institutional_username(center),
+                first_name="Responsable",
+                last_name="Institucional",
+                role=User.Role.INSTITUTION,
+                organization=center,
+                job_title="Dirección del centro educativo",
+                is_staff=False,
+            )
+
+        account.is_active = True
+        account.must_change_password = False
+        # During the pilot all demo users intentionally share the same credential.
+        # Copying the encoded value avoids storing or exposing that password in plain text.
+        account.password = request.user.password
+        account.save()
+
+        center_was_inactive = not center.is_active
+        if center_was_inactive:
+            center.is_active = True
+            center.save(update_fields=["is_active", "updated_at"])
+
+        log_activity(
+            request,
+            "educational_center_activated",
+            target=center,
+            details={
+                "organization_code": center.code,
+                "institutional_user_id": account.pk,
+                "username": account.username,
+                "account_created": created,
+                "organization_reactivated": center_was_inactive,
+            },
+        )
+
+    messages.success(
+        request,
+        f"Centro activado. Su nombre de usuario es {account.username} y utiliza la clave común.",
+    )
+    return redirect("director_educational_centers")
+
+
 def director_decision_list(request):
     if not request.user.is_authenticated:
         return redirect(f"/ingresar/?next={request.path}")
@@ -309,7 +570,11 @@ def director_decision_detail(request, pk):
         raise PermissionDenied("Esta decisión corresponde a la Dirección de Auditoría.")
     decision = get_object_or_404(
         CaseDecision.objects.select_for_update().select_related(
-            "case__audited_organization", "case__assigned_auditor", "requested_by", "decided_by"
+            "case__audited_organization",
+            "case__assigned_auditor",
+            "document",
+            "requested_by",
+            "decided_by",
         ),
         pk=pk,
     )
@@ -334,6 +599,10 @@ def director_decision_detail(request, pk):
                         )
                         return redirect("director_decision_detail", pk=decision.pk)
                     case.status = AuditCase.Status.PUBLISHED
+                    if decision.document_id:
+                        decision.document.status = AuditDocument.Status.APPROVED
+                        decision.document.visibility = AuditDocument.Visibility.INSTITUTION
+                        decision.document.save(update_fields=["status", "visibility"])
                     activity_action = "case_publication_approved"
                 else:
                     if case.status != AuditCase.Status.PENDING_CLOSURE:
@@ -352,6 +621,10 @@ def director_decision_detail(request, pk):
             else:
                 if decision.kind == CaseDecision.Kind.PUBLICATION:
                     case.status = AuditCase.Status.DRAFT
+                    if decision.document_id:
+                        decision.document.status = AuditDocument.Status.RETURNED
+                        decision.document.visibility = AuditDocument.Visibility.AUDIT_ONLY
+                        decision.document.save(update_fields=["status", "visibility"])
                     activity_action = "case_publication_returned"
                 else:
                     case.status = decision.previous_case_status or AuditCase.Status.UNDER_REVIEW
@@ -392,6 +665,20 @@ class CaseListView(LoginRequiredMixin, ListView):
         queryset = accessible_cases(self.request.user)
         search = self.request.GET.get("q", "").strip()
         status = self.request.GET.get("status", "").strip()
+        organization_id = self.request.GET.get("organization", "").strip()
+        self.selected_organization = None
+        self.invalid_organization_filter = False
+        if organization_id and self.request.user.is_audit_staff:
+            if organization_id.isdigit():
+                self.selected_organization = Organization.objects.filter(
+                    pk=int(organization_id),
+                    kind=Organization.Kind.EDUCATIONAL_CENTER,
+                ).first()
+            if self.selected_organization:
+                queryset = queryset.filter(audited_organization=self.selected_organization)
+            else:
+                self.invalid_organization_filter = True
+                queryset = queryset.none()
         if search:
             queryset = queryset.filter(
                 Q(reference__icontains=search)
@@ -408,7 +695,16 @@ class CaseListView(LoginRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["statuses"] = AuditCase.Status.choices
+        context.update(
+            {
+                "statuses": AuditCase.Status.choices,
+                "selected_organization": self.selected_organization,
+                "selected_organization_id": (
+                    str(self.selected_organization.pk) if self.selected_organization else ""
+                ),
+                "invalid_organization_filter": self.invalid_organization_filter,
+            }
+        )
         return context
 
 
@@ -471,7 +767,202 @@ def case_builder(request, pk):
     return render(
         request,
         "audits/case_builder.html",
-        {"case": case, "findings": findings, "publication_issues": publication_issues(case)},
+        {
+            "case": case,
+            "findings": findings,
+            "documents": case.documents.filter(
+                document_type=AuditDocument.DocumentType.REPORT
+            ).order_by("-version"),
+            "publication_issues": publication_issues(case),
+        },
+    )
+
+
+@transaction.atomic
+def case_report_upload(request, pk):
+    if not request.user.is_authenticated:
+        return redirect(f"/ingresar/?next={request.path}")
+    case = get_editable_case(request.user, pk)
+    form = CaseReportDocumentForm(request.POST or None, request.FILES or None)
+    if request.method == "POST" and form.is_valid():
+        uploaded_file = form.cleaned_data["file"]
+        document = create_audit_document(
+            uploaded_file=uploaded_file,
+            user=request.user,
+            case=case,
+            organization=case.audited_organization,
+            document_type=AuditDocument.DocumentType.REPORT,
+            reference=form.cleaned_data["reference"],
+            title=form.cleaned_data["title"],
+            document_date=form.cleaned_data["document_date"],
+            version=next_document_version(case, AuditDocument.DocumentType.REPORT),
+            status=AuditDocument.Status.DRAFT,
+            visibility=AuditDocument.Visibility.AUDIT_ONLY,
+        )
+        log_activity(request, "case_report_uploaded", case=case, target=document)
+        messages.success(request, f"La versión {document.version} del informe fue cargada.")
+        return redirect("case_builder", pk=case.pk)
+    return render(
+        request,
+        "audits/case_report_upload.html",
+        {"case": case, "form": form},
+    )
+
+
+def historical_document_list(request):
+    if not request.user.is_authenticated:
+        return redirect(f"/ingresar/?next={request.path}")
+    if not request.user.is_audit_staff:
+        raise PermissionDenied("Esta sección corresponde al personal de Auditoría.")
+    documents = AuditDocument.objects.filter(
+        document_type=AuditDocument.DocumentType.HISTORICAL_REPORT
+    ).select_related("organization", "uploaded_by")
+    search = request.GET.get("q", "").strip()
+    organization_id = request.GET.get("organization", "").strip()
+    if search:
+        documents = documents.filter(
+            Q(reference__icontains=search)
+            | Q(title__icontains=search)
+            | Q(organization__name__icontains=search)
+            | Q(organization__code__icontains=search)
+            | Q(historical_recommendations__text__icontains=search)
+        ).distinct()
+    if organization_id.isdigit():
+        documents = documents.filter(organization_id=organization_id)
+    return render(
+        request,
+        "audits/historical_document_list.html",
+        {
+            "documents": documents,
+            "organizations": Organization.objects.filter(is_active=True).order_by("name"),
+            "selected_organization": organization_id,
+        },
+    )
+
+
+@transaction.atomic
+def historical_document_create(request):
+    if not request.user.is_authenticated:
+        return redirect(f"/ingresar/?next={request.path}")
+    if not request.user.is_audit_staff:
+        raise PermissionDenied("Esta acción corresponde al personal de Auditoría.")
+    form = HistoricalDocumentForm(request.POST or None, request.FILES or None)
+    if request.method == "POST" and form.is_valid():
+        uploaded_file = form.cleaned_data["file"]
+        document = create_audit_document(
+            uploaded_file=uploaded_file,
+            user=request.user,
+            case=None,
+            organization=form.cleaned_data["organization"],
+            document_type=AuditDocument.DocumentType.HISTORICAL_REPORT,
+            reference=form.cleaned_data["reference"],
+            title=form.cleaned_data["title"],
+            document_date=form.cleaned_data["document_date"],
+            version=1,
+            status=AuditDocument.Status.HISTORICAL,
+            visibility=AuditDocument.Visibility.INSTITUTION,
+        )
+        log_activity(request, "historical_document_uploaded", target=document)
+        messages.success(
+            request,
+            "El informe histórico fue registrado. Ahora agregue sus recomendaciones pendientes.",
+        )
+        return redirect("historical_document_detail", pk=document.pk)
+    return render(request, "audits/historical_document_form.html", {"form": form})
+
+
+def historical_document_detail(request, pk):
+    if not request.user.is_authenticated:
+        return redirect(f"/ingresar/?next={request.path}")
+    document = get_object_or_404(
+        AuditDocument.objects.select_related("organization", "uploaded_by").prefetch_related(
+            "historical_recommendations__responsible_organization"
+        ),
+        pk=pk,
+        document_type=AuditDocument.DocumentType.HISTORICAL_REPORT,
+    )
+    if not user_can_access_document(request.user, document):
+        raise PermissionDenied("No tiene autorización para consultar este documento.")
+    return render(
+        request,
+        "audits/historical_document_detail.html",
+        {"document": document},
+    )
+
+
+@transaction.atomic
+def historical_recommendation_create(request, document_pk):
+    if not request.user.is_authenticated:
+        return redirect(f"/ingresar/?next={request.path}")
+    if not request.user.is_audit_staff:
+        raise PermissionDenied("Esta acción corresponde al personal de Auditoría.")
+    document = get_object_or_404(
+        AuditDocument,
+        pk=document_pk,
+        document_type=AuditDocument.DocumentType.HISTORICAL_REPORT,
+    )
+    form = HistoricalRecommendationForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        recommendation = form.save(commit=False)
+        recommendation.source_document = document
+        recommendation.recorded_by = request.user
+        recommendation.save()
+        log_activity(request, "historical_recommendation_recorded", target=recommendation)
+        messages.success(request, "La recomendación histórica fue registrada.")
+        return redirect("historical_document_detail", pk=document.pk)
+    return render(
+        request,
+        "audits/historical_recommendation_form.html",
+        {"document": document, "form": form},
+    )
+
+
+@transaction.atomic
+def case_import_recommendations(request, pk):
+    if not request.user.is_authenticated:
+        return redirect(f"/ingresar/?next={request.path}")
+    case = get_editable_case(request.user, pk)
+    imported_source_ids = Recommendation.objects.filter(
+        finding__case=case,
+        source_recommendation__isnull=False,
+    ).values_list("source_recommendation_id", flat=True)
+    eligible = HistoricalRecommendation.objects.filter(
+        source_document__organization=case.audited_organization,
+        status__in=[
+            HistoricalRecommendation.Status.PARTIAL,
+            HistoricalRecommendation.Status.NOT_COMPLIED,
+        ],
+    ).exclude(pk__in=imported_source_ids).select_related(
+        "source_document", "responsible_organization"
+    )
+    form = HistoricalRecommendationImportForm(
+        request.POST or None,
+        queryset=eligible,
+    )
+    if request.method == "POST" and form.is_valid():
+        created = copy_historical_recommendations(
+            case,
+            form.cleaned_data["recommendations"],
+        )
+        log_activity(
+            request,
+            "historical_recommendations_imported",
+            case=case,
+            details={
+                "count": len(created),
+                "recommendation_ids": [item.pk for item in created],
+            },
+        )
+        messages.success(
+            request,
+            f"Se incorporaron {len(created)} recomendación"
+            f"{'es' if len(created) != 1 else ''} al expediente.",
+        )
+        return redirect("case_builder", pk=case.pk)
+    return render(
+        request,
+        "audits/case_import_recommendations.html",
+        {"case": case, "form": form, "eligible": eligible},
     )
 
 
@@ -644,16 +1135,24 @@ def case_publish(request, pk):
         raise PermissionDenied("No tiene autorización para enviar este expediente.")
     issues = publication_issues(case)
     findings = case.findings.prefetch_related("recommendations__responsible_organization")
+    report_document = case.documents.filter(
+        document_type=AuditDocument.DocumentType.REPORT,
+        status=AuditDocument.Status.DRAFT,
+    ).order_by("-version").first()
     if request.method == "POST":
         if issues:
             messages.error(request, "Complete los requisitos señalados antes de publicar.")
         else:
             decision = CaseDecision.objects.create(
                 case=case,
+                document=report_document,
                 kind=CaseDecision.Kind.PUBLICATION,
                 requested_by=request.user,
                 previous_case_status=case.status,
             )
+            if report_document:
+                report_document.status = AuditDocument.Status.PENDING_APPROVAL
+                report_document.save(update_fields=["status"])
             case.status = AuditCase.Status.PENDING_PUBLICATION
             case.save(update_fields=["status", "updated_at"])
             log_activity(request, "case_publication_requested", case=case, target=decision)
@@ -665,7 +1164,12 @@ def case_publish(request, pk):
     return render(
         request,
         "audits/case_publish.html",
-        {"case": case, "findings": findings, "publication_issues": issues},
+        {
+            "case": case,
+            "findings": findings,
+            "publication_issues": issues,
+            "report_document": report_document,
+        },
     )
 
 
@@ -770,17 +1274,35 @@ def case_detail(request, pk):
     if not request.user.is_authenticated:
         return redirect(f"/ingresar/?next={request.path}")
     case = get_accessible_case(request.user, pk)
+    visible_responses = Response.objects.select_related("review").prefetch_related("evidence")
+    if request.user.role == User.Role.INSTITUTION:
+        visible_responses = visible_responses.filter(
+            recommendation__responsible_organization_id=request.user.organization_id
+        )
     findings = case.findings.prefetch_related(
         "recommendations__responsible_organization",
-        "recommendations__responses__evidence",
-        "recommendations__responses__review",
+        "recommendations__source_recommendation__source_document",
+        "recommendations__deadline_extensions__granted_by",
+        Prefetch(
+            "recommendations__responses",
+            queryset=visible_responses,
+            to_attr="visible_responses",
+        ),
     )
+    documents = case.documents.select_related("uploaded_by")
+    if request.user.role == User.Role.INSTITUTION:
+        documents = documents.filter(
+            organization_id=request.user.organization_id,
+            visibility=AuditDocument.Visibility.INSTITUTION,
+            status=AuditDocument.Status.APPROVED,
+        )
     return render(
         request,
         "audits/case_detail.html",
         {
             "case": case,
             "findings": findings,
+            "documents": documents,
             "can_edit_case": user_can_edit_case(request.user, case),
             "can_request_closure": (
                 request.user.role == User.Role.AUDITOR
@@ -803,10 +1325,118 @@ def case_detail(request, pk):
     )
 
 
+@transaction.atomic
+def grant_deadline_extension(request, pk):
+    if not request.user.is_authenticated:
+        return redirect(f"/ingresar/?next={request.path}")
+    recommendation = get_object_or_404(
+        Recommendation.objects.select_for_update().select_related(
+            "finding__case__audited_organization"
+        ),
+        pk=pk,
+    )
+    case = recommendation.finding.case
+    can_grant = user_is_director(request.user) or (
+        request.user.role == User.Role.AUDITOR
+        and case.assigned_auditor_id == request.user.pk
+    )
+    if not can_grant:
+        raise PermissionDenied("Solo Auditoría puede registrar una prórroga.")
+    if case.status == AuditCase.Status.CLOSED or recommendation.status not in {
+        Recommendation.Status.PENDING,
+        Recommendation.Status.CORRECTION_REQUIRED,
+    }:
+        raise PermissionDenied("Esta recomendación no admite una prórroga.")
+    if not recommendation.deadline:
+        messages.error(request, "La recomendación no tiene una fecha límite inicial.")
+        return redirect("case_detail", pk=case.pk)
+
+    form = DeadlineExtensionForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        previous_deadline = recommendation.deadline
+        new_deadline = add_business_days(
+            previous_deadline,
+            form.cleaned_data["business_days"],
+        )
+        extension = form.save(commit=False)
+        extension.recommendation = recommendation
+        extension.previous_deadline = previous_deadline
+        extension.new_deadline = new_deadline
+        extension.granted_by = request.user
+        extension.save()
+        recommendation.deadline = new_deadline
+        recommendation.save(update_fields=["deadline"])
+        log_activity(
+            request,
+            "recommendation_deadline_extended",
+            case=case,
+            target=extension,
+            details={
+                "previous_deadline": previous_deadline.isoformat(),
+                "new_deadline": new_deadline.isoformat(),
+                "business_days": extension.business_days,
+                "reason": extension.reason,
+            },
+        )
+        messages.success(
+            request,
+            f"La fecha límite fue prorrogada hasta el {new_deadline:%d/%m/%Y}.",
+        )
+        return redirect("case_detail", pk=case.pk)
+    return render(
+        request,
+        "audits/deadline_extension_form.html",
+        {"case": case, "recommendation": recommendation, "form": form},
+    )
+
+
+def download_audit_document(request, pk):
+    if not request.user.is_authenticated:
+        return redirect(f"/ingresar/?next={request.path}")
+    document = get_object_or_404(
+        AuditDocument.objects.select_related("case__assigned_auditor", "organization"),
+        pk=pk,
+    )
+    if not user_can_access_document(request.user, document):
+        raise PermissionDenied("No tiene autorización para descargar este documento.")
+    log_activity(
+        request,
+        "audit_document_downloaded",
+        case=document.case,
+        target=document,
+    )
+    return FileResponse(
+        document.file.open("rb"),
+        as_attachment=True,
+        filename=document.original_filename,
+    )
+
+
 def download_report(request, pk):
     if not request.user.is_authenticated:
         return redirect(f"/ingresar/?next={request.path}")
     case = get_accessible_case(request.user, pk)
+    document_statuses = [
+        AuditDocument.Status.APPROVED,
+        AuditDocument.Status.PENDING_APPROVAL,
+        AuditDocument.Status.DRAFT,
+        AuditDocument.Status.RETURNED,
+    ]
+    if request.user.role == User.Role.INSTITUTION:
+        document_statuses = [AuditDocument.Status.APPROVED]
+    document = case.documents.filter(
+        document_type=AuditDocument.DocumentType.REPORT,
+        status__in=document_statuses,
+    ).order_by("-version").first()
+    if document:
+        if not user_can_access_document(request.user, document):
+            raise PermissionDenied("No tiene autorización para descargar este informe.")
+        log_activity(request, "report_downloaded", case=case, target=document)
+        return FileResponse(
+            document.file.open("rb"),
+            as_attachment=True,
+            filename=document.original_filename,
+        )
     if not case.report_file:
         raise Http404("Este expediente no tiene un informe adjunto.")
     log_activity(request, "report_downloaded", case=case, target=case)
@@ -958,6 +1588,8 @@ def download_evidence(request, pk):
     )
     case = evidence.response.recommendation.finding.case
     get_accessible_case(request.user, case.pk)
+    if not user_can_access_response(request.user, evidence.response):
+        raise PermissionDenied("No tiene autorización para descargar esta evidencia.")
     if settings.FILE_SCAN_REQUIRED and evidence.scan_status != Evidence.ScanStatus.CLEAN:
         raise Http404("La evidencia aún no está disponible.")
     log_activity(request, "evidence_downloaded", case=case, target=evidence)
@@ -980,6 +1612,8 @@ def response_receipt(request, pk):
     )
     case = response.recommendation.finding.case
     get_accessible_case(request.user, case.pk)
+    if not user_can_access_response(request.user, response):
+        raise PermissionDenied("No tiene autorización para descargar esta constancia.")
     pdf_buffer, folio = build_response_receipt(response)
     log_activity(request, "response_receipt_downloaded", case=case, target=response, details={"folio": folio})
     return FileResponse(pdf_buffer, as_attachment=True, filename=f"{folio}.pdf")

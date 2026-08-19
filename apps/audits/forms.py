@@ -8,7 +8,17 @@ from apps.institutions.models import Organization
 
 from apps.core.validators import validate_evidence_file
 
-from .models import AuditCase, Evidence, Finding, Recommendation, Response, Review
+from .models import (
+    AuditCase,
+    AuditDocument,
+    DeadlineExtension,
+    Evidence,
+    Finding,
+    HistoricalRecommendation,
+    Recommendation,
+    Response,
+    Review,
+)
 
 
 class AuditCaseForm(forms.ModelForm):
@@ -18,7 +28,6 @@ class AuditCaseForm(forms.ModelForm):
             "reference",
             "title",
             "audited_organization",
-            "report_file",
             "report_date",
             "period_start",
             "period_end",
@@ -27,15 +36,13 @@ class AuditCaseForm(forms.ModelForm):
         )
         widgets = {
             "title": forms.Textarea(attrs={"rows": 2}),
-            "report_file": forms.ClearableFileInput(attrs={"accept": ".pdf,application/pdf"}),
             "report_date": forms.DateInput(attrs={"type": "date"}),
             "period_start": forms.DateInput(attrs={"type": "date"}),
             "period_end": forms.DateInput(attrs={"type": "date"}),
             "response_deadline": forms.DateInput(attrs={"type": "date"}),
         }
         help_texts = {
-            "reference": "Use la referencia oficial y única del informe.",
-            "report_file": "Puede guardarlo como borrador sin informe; se exigirá un PDF antes de publicar.",
+            "reference": "Use la referencia oficial y única del expediente.",
             "response_deadline": "Fecha general para que las instituciones responsables respondan.",
         }
 
@@ -55,12 +62,6 @@ class AuditCaseForm(forms.ModelForm):
             self.fields["assigned_auditor"].disabled = True
             self.fields["assigned_auditor"].help_text = "El expediente quedará asignado a usted."
 
-    def clean_report_file(self):
-        report = self.cleaned_data.get("report_file")
-        if report and Path(report.name).suffix.lower() != ".pdf":
-            raise forms.ValidationError("El informe de auditoría debe ser un archivo PDF.")
-        return report
-
     def clean(self):
         cleaned = super().clean()
         period_start = cleaned.get("period_start")
@@ -75,6 +76,107 @@ class AuditCaseForm(forms.ModelForm):
                 "La fecha límite de respuesta no puede ser anterior a la fecha del informe.",
             )
         return cleaned
+
+
+class CaseReportDocumentForm(forms.ModelForm):
+    class Meta:
+        model = AuditDocument
+        fields = ("reference", "title", "document_date", "file")
+        widgets = {
+            "document_date": forms.DateInput(attrs={"type": "date"}),
+            "file": forms.ClearableFileInput(attrs={"accept": ".docx"}),
+        }
+        help_texts = {
+            "file": "Cargue el informe elaborado en Word (.docx).",
+            "reference": "Referencia que aparecerá en el historial del centro.",
+        }
+
+    def clean_file(self):
+        document = self.cleaned_data.get("file")
+        if document and Path(document.name).suffix.lower() != ".docx":
+            raise forms.ValidationError("El informe debe cargarse en formato Word (.docx).")
+        return document
+
+
+class HistoricalDocumentForm(forms.ModelForm):
+    class Meta:
+        model = AuditDocument
+        fields = (
+            "organization",
+            "reference",
+            "title",
+            "document_date",
+            "file",
+        )
+        widgets = {
+            "document_date": forms.DateInput(attrs={"type": "date"}),
+            "file": forms.ClearableFileInput(attrs={"accept": ".pdf,.docx"}),
+        }
+        help_texts = {
+            "file": "Se admiten informes históricos en PDF o Word (.docx).",
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["organization"].queryset = Organization.objects.filter(
+            is_active=True
+        ).order_by("name")
+
+    def clean_file(self):
+        document = self.cleaned_data.get("file")
+        extension = Path(document.name).suffix.lower() if document else ""
+        if extension not in {".pdf", ".docx"}:
+            raise forms.ValidationError("El documento histórico debe ser PDF o Word (.docx).")
+        return document
+
+
+class HistoricalRecommendationForm(forms.ModelForm):
+    class Meta:
+        model = HistoricalRecommendation
+        fields = (
+            "number",
+            "text",
+            "responsible_organization",
+            "responsible_description",
+            "status",
+            "comments",
+            "original_deadline",
+        )
+        widgets = {
+            "text": forms.Textarea(attrs={"rows": 6}),
+            "comments": forms.Textarea(attrs={"rows": 4}),
+            "original_deadline": forms.DateInput(attrs={"type": "date"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["responsible_organization"].queryset = Organization.objects.filter(
+            is_active=True
+        ).order_by("name")
+
+
+class HistoricalRecommendationImportForm(forms.Form):
+    recommendations = forms.ModelMultipleChoiceField(
+        label="Recomendaciones que se incorporarán",
+        queryset=HistoricalRecommendation.objects.none(),
+        widget=forms.CheckboxSelectMultiple,
+    )
+
+    def __init__(self, *args, queryset=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if queryset is not None:
+            self.fields["recommendations"].queryset = queryset
+
+
+class DeadlineExtensionForm(forms.ModelForm):
+    class Meta:
+        model = DeadlineExtension
+        fields = ("business_days", "reason")
+        widgets = {"reason": forms.Textarea(attrs={"rows": 4})}
+        help_texts = {
+            "business_days": "Se excluirán fines de semana y asuetos configurados.",
+            "reason": "La prórroga y su fundamento quedarán en el expediente.",
+        }
 
 
 class FindingForm(forms.ModelForm):
@@ -168,8 +270,20 @@ class MultipleFileField(forms.FileField):
     def clean(self, data, initial=None):
         clean_one = super().clean
         if isinstance(data, (list, tuple)):
+            if not data and self.required:
+                raise forms.ValidationError(
+                    self.error_messages["required"],
+                    code="required",
+                )
             return [clean_one(item, initial) for item in data]
-        return [clean_one(data, initial)] if data else []
+        if data:
+            return [clean_one(data, initial)]
+        if self.required:
+            raise forms.ValidationError(
+                self.error_messages["required"],
+                code="required",
+            )
+        return []
 
 
 class ResponseForm(forms.ModelForm):
