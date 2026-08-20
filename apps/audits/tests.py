@@ -507,6 +507,35 @@ class AccessAndWorkflowTests(TestCase):
         response = self.client.get(reverse("case_detail", args=[self.case.pk]))
         self.assertContains(response, "Presentar respuesta")
 
+    def test_institution_case_detail_hides_auditor_identity(self):
+        self.auditor.first_name = "NombreReservado"
+        self.auditor.last_name = "Auditor"
+        self.auditor.save(update_fields=["first_name", "last_name"])
+
+        self.client.force_login(self.institution_user)
+        response = self.client.get(reverse("case_detail", args=[self.case.pk]))
+
+        self.assertNotContains(response, "Auditor responsable")
+        self.assertNotContains(response, "NombreReservado Auditor")
+
+    def test_pending_recommendation_for_another_organization_explains_missing_response_button(self):
+        Recommendation.objects.create(
+            finding=self.finding,
+            number=2,
+            text="Coordinar el seguimiento departamental.",
+            responsible_organization=self.other_center,
+            deadline=date.today(),
+        )
+
+        self.client.force_login(self.institution_user)
+        response = self.client.get(reverse("case_detail", args=[self.case.pk]))
+
+        self.assertContains(
+            response,
+            f"La respuesta debe ser presentada por {self.other_center.name}.",
+        )
+        self.assertEqual(response.content.decode().count("Presentar respuesta"), 1)
+
     def test_responsible_organization_can_submit_response_and_evidence(self):
         cde_period = SchoolBoardPeriod.objects.create(
             organization=self.center,
