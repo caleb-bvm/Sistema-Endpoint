@@ -5,7 +5,7 @@
 Mantener en un único expediente verificable el informe, los hallazgos, las recomendaciones, las respuestas institucionales, las evidencias y las decisiones de Auditoría Interna.
 
 El expediente funciona además como historial permanente del centro. Los informes anteriores
-se registran como documentos históricos y sus recomendaciones no cumplidas o parcialmente
+se registran como documentos anteriores y sus recomendaciones no cumplidas o parcialmente
 cumplidas pueden incorporarse, conservando su procedencia, a un seguimiento posterior.
 
 ## Componentes
@@ -56,7 +56,7 @@ Los formatos iniciales permitidos son PDF, JPG, PNG, DOCX y XLSX. La validación
 Los nuevos informes se elaboran fuera del sistema y se cargan en Word. Cada carga crea una
 versión independiente. La Dirección aprueba o devuelve el informe completo; solamente la
 versión aprobada se publica para la institución. Los PDF y Word anteriores se conservan en el
-repositorio histórico.
+repositorio de informes anteriores.
 
 Las respuestas institucionales siempre requieren al menos un documento. La validación rechaza
 el envío si no se adjunta ningún archivo. Una institución puede

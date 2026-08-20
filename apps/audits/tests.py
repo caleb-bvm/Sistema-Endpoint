@@ -1053,6 +1053,119 @@ class AccessAndWorkflowTests(TestCase):
             1,
         )
 
+    def test_report_repository_combines_and_filters_report_types(self):
+        current_document = AuditDocument.objects.create(
+            case=self.case,
+            organization=self.center,
+            document_type=AuditDocument.DocumentType.REPORT,
+            reference="IA-ACTUAL-001",
+            title="Informe del expediente actual",
+            document_date=date.today(),
+            version=2,
+            status=AuditDocument.Status.APPROVED,
+            visibility=AuditDocument.Visibility.INSTITUTION,
+            file=SimpleUploadedFile("actual.docx", b"documento actual"),
+            original_filename="actual.docx",
+            size=16,
+            sha256="4" * 64,
+            uploaded_by=self.auditor,
+        )
+        previous_document = AuditDocument.objects.create(
+            organization=self.center,
+            document_type=AuditDocument.DocumentType.HISTORICAL_REPORT,
+            reference="IA-ANTERIOR-001",
+            title="Informe anterior registrado",
+            document_date=date.today() - timedelta(days=365),
+            version=1,
+            status=AuditDocument.Status.HISTORICAL,
+            visibility=AuditDocument.Visibility.INSTITUTION,
+            file=SimpleUploadedFile("anterior.pdf", b"%PDF-1.4\nanterior"),
+            original_filename="anterior.pdf",
+            size=18,
+            sha256="5" * 64,
+            uploaded_by=self.auditor,
+        )
+        HistoricalRecommendation.objects.create(
+            source_document=previous_document,
+            number="R-1",
+            text="Complete el control pendiente.",
+            responsible_organization=self.center,
+            status=HistoricalRecommendation.Status.PARTIAL,
+            recorded_by=self.auditor,
+        )
+        self.client.force_login(self.director)
+
+        combined = self.client.get(reverse("historical_document_list"))
+        self.assertContains(combined, current_document.reference)
+        self.assertContains(combined, previous_document.reference)
+        self.assertContains(combined, "Informe del expediente")
+        self.assertContains(combined, "Informe anterior")
+
+        current_only = self.client.get(
+            reverse("historical_document_list"),
+            {"type": AuditDocument.DocumentType.REPORT},
+        )
+        self.assertContains(current_only, current_document.reference)
+        self.assertNotContains(current_only, previous_document.reference)
+
+        previous_only = self.client.get(
+            reverse("historical_document_list"),
+            {"type": AuditDocument.DocumentType.HISTORICAL_REPORT},
+        )
+        self.assertNotContains(previous_only, current_document.reference)
+        self.assertContains(previous_only, previous_document.reference)
+
+    def test_report_repository_hides_unassigned_case_reports_from_auditor(self):
+        assigned_document = AuditDocument.objects.create(
+            case=self.case,
+            organization=self.center,
+            document_type=AuditDocument.DocumentType.REPORT,
+            reference="IA-ASIGNADO-001",
+            title="Informe asignado",
+            status=AuditDocument.Status.APPROVED,
+            visibility=AuditDocument.Visibility.INSTITUTION,
+            file=SimpleUploadedFile("asignado.docx", b"asignado"),
+            original_filename="asignado.docx",
+            size=8,
+            sha256="6" * 64,
+            uploaded_by=self.auditor,
+        )
+        other_auditor = User.objects.create_user(
+            username="auditor-repositorio",
+            password="UnaClaveDePrueba!2026",
+            role=User.Role.AUDITOR,
+            organization=self.audit_unit,
+            must_change_password=False,
+        )
+        other_case = AuditCase.objects.create(
+            reference="IA-OTRO-001",
+            title="Expediente de otro auditor",
+            audited_organization=self.other_center,
+            status=AuditCase.Status.PUBLISHED,
+            assigned_auditor=other_auditor,
+            created_by=other_auditor,
+        )
+        hidden_document = AuditDocument.objects.create(
+            case=other_case,
+            organization=self.other_center,
+            document_type=AuditDocument.DocumentType.REPORT,
+            reference="IA-NO-ASIGNADO-001",
+            title="Informe no asignado",
+            status=AuditDocument.Status.APPROVED,
+            visibility=AuditDocument.Visibility.INSTITUTION,
+            file=SimpleUploadedFile("no-asignado.docx", b"no asignado"),
+            original_filename="no-asignado.docx",
+            size=11,
+            sha256="7" * 64,
+            uploaded_by=other_auditor,
+        )
+        self.client.force_login(self.auditor)
+
+        result = self.client.get(reverse("historical_document_list"))
+
+        self.assertContains(result, assigned_document.reference)
+        self.assertNotContains(result, hidden_document.reference)
+
     def test_auditor_can_upload_versioned_word_report(self):
         draft_case = AuditCase.objects.create(
             reference="IA-WORD-001",

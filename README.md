@@ -16,7 +16,7 @@ Primera base funcional para registrar expedientes, hallazgos, recomendaciones, r
 - Perfil de Dirección de Auditoría con resumen ejecutivo, bandeja de decisiones, aprobación de publicaciones y cierres, y reasignación justificada de auditores.
 - Catálogo consultable de centros educativos para Dirección, con búsqueda, estado de acceso, activación y acceso directo a sus expedientes.
 - Importación validada del catálogo institucional desde CSV.
-- Repositorio de informes históricos en PDF y Word.
+- Repositorio de informes anteriores en PDF y Word.
 - Copia controlada y sin duplicados de recomendaciones no cumplidas o parcialmente cumplidas.
 - Informes Word versionados, con aprobación directiva antes de su publicación.
 - Prórrogas calculadas en días hábiles y calendario configurable de asuetos.
@@ -25,12 +25,27 @@ Primera base funcional para registrar expedientes, hallazgos, recomendaciones, r
 
 ## Inicio local en Windows
 
+Para iniciar normalmente el proyecto y permitir el acceso desde una PC y un teléfono
+Android conectados a la misma red o hotspot, use un solo comando:
+
+```powershell
+.\iniciar.ps1
+```
+
+El iniciador detecta automáticamente la dirección IPv4 activa, aplica las migraciones,
+muestra los enlaces para la PC y Android, y publica el servidor en el puerto `8000`.
+Si el puerto ya está ocupado, detenga el servidor anterior con `Ctrl+C` y ejecute el
+comando nuevamente. La dirección puede cambiar al reconectarse al hotspot, por lo que
+debe utilizar el enlace que muestre el iniciador en cada sesión.
+
+Para la preparación inicial del proyecto:
+
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 .\.venv\Scripts\python.exe manage.py migrate
 .\.venv\Scripts\python.exe manage.py seed_demo
-.\.venv\Scripts\python.exe manage.py runserver
+.\iniciar.ps1
 ```
 
 La primera ejecución de `seed_demo` genera credenciales temporales y las muestra una sola vez en la consola. Las ejecuciones posteriores actualizan los datos de ejemplo, pero conservan esas contraseñas. Para regenerarlas deliberadamente, use `python manage.py seed_demo --reset-passwords`. Solo debe utilizarse en desarrollo local.

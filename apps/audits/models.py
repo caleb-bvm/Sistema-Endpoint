@@ -78,13 +78,13 @@ class AuditCase(models.Model):
 
 class AuditDocument(models.Model):
     class DocumentType(models.TextChoices):
-        HISTORICAL_REPORT = "historical_report", "Informe histórico"
+        HISTORICAL_REPORT = "historical_report", "Informe anterior"
         REPORT = "report", "Informe del expediente"
         NOTIFICATION = "notification", "Notificación"
         OTHER = "other", "Otro documento"
 
     class Status(models.TextChoices):
-        HISTORICAL = "historical", "Histórico"
+        HISTORICAL = "historical", "Anterior"
         DRAFT = "draft", "Borrador"
         PENDING_APPROVAL = "pending_approval", "Pendiente de aprobación"
         APPROVED = "approved", "Aprobado"

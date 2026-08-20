@@ -1,27 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Ingresar | Auditoría Interna{% endblock %}
 {% block content %}
-<section class="login-layout">
-    <div class="login-intro">
-        <div class="login-orb login-orb-one" aria-hidden="true"></div>
-        <div class="login-orb login-orb-two" aria-hidden="true"></div>
-        <div class="login-copy">
-            <p class="eyebrow">Sistema institucional de auditoría</p>
-            <h1>Seguimiento de <em>recomendaciones</em></h1>
-            <p>Consulte expedientes, presente respuestas y adjunte los documentos requeridos.</p>
-            <div class="process-chips" aria-label="Proceso del sistema">
-                <span><b>1</b> Consulte expedientes</span><span><b>2</b> Presente respuestas</span><span><b>3</b> Verifique resultados</span>
-            </div>
-            <div class="security-note">
-                <span class="security-icon" aria-hidden="true">◇</span>
-                <span><strong>Historial completo</strong><small>Cada operación y documento queda registrado en su expediente.</small></span>
-            </div>
-        </div>
-    </div>
+<section class="login-page">
     <div class="login-card">
-        <span class="login-card-icon" aria-hidden="true">→</span>
-        <p class="eyebrow">Acceso al sistema</p>
-        <h2>Inicio de sesión</h2>
+        <p class="eyebrow">Auditoría Interna</p>
+        <h1>Iniciar sesión</h1>
         <p>Utilice las credenciales asignadas a su institución.</p>
         {% if form.errors %}<div class="form-error">Las credenciales ingresadas no son válidas.</div>{% endif %}
         <form method="post" class="stacked-form">

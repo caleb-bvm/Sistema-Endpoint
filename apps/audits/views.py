@@ -814,21 +814,61 @@ def historical_document_list(request):
         return redirect(f"/ingresar/?next={request.path}")
     if not request.user.is_audit_staff:
         raise PermissionDenied("Esta sección corresponde al personal de Auditoría.")
+
     documents = AuditDocument.objects.filter(
-        document_type=AuditDocument.DocumentType.HISTORICAL_REPORT
-    ).select_related("organization", "uploaded_by")
+        document_type__in=[
+            AuditDocument.DocumentType.REPORT,
+            AuditDocument.DocumentType.HISTORICAL_REPORT,
+        ]
+    ).select_related("case", "organization", "uploaded_by")
+
+    if request.user.role == User.Role.AUDITOR:
+        documents = documents.filter(
+            Q(document_type=AuditDocument.DocumentType.HISTORICAL_REPORT)
+            | Q(
+                document_type=AuditDocument.DocumentType.REPORT,
+                case__assigned_auditor=request.user,
+            )
+        )
+
     search = request.GET.get("q", "").strip()
     organization_id = request.GET.get("organization", "").strip()
+    document_type = request.GET.get("type", "").strip()
+
     if search:
         documents = documents.filter(
             Q(reference__icontains=search)
             | Q(title__icontains=search)
             | Q(organization__name__icontains=search)
             | Q(organization__code__icontains=search)
+            | Q(case__reference__icontains=search)
+            | Q(case__title__icontains=search)
+            | Q(case__findings__recommendations__text__icontains=search)
             | Q(historical_recommendations__text__icontains=search)
         ).distinct()
     if organization_id.isdigit():
         documents = documents.filter(organization_id=organization_id)
+
+    valid_document_types = {
+        AuditDocument.DocumentType.REPORT,
+        AuditDocument.DocumentType.HISTORICAL_REPORT,
+    }
+    if document_type in valid_document_types:
+        documents = documents.filter(document_type=document_type)
+    else:
+        document_type = ""
+
+    documents = documents.annotate(
+        case_recommendation_count=Count(
+            "case__findings__recommendations",
+            distinct=True,
+        ),
+        previous_recommendation_count=Count(
+            "historical_recommendations",
+            distinct=True,
+        ),
+    )
+
     return render(
         request,
         "audits/historical_document_list.html",
@@ -836,6 +876,7 @@ def historical_document_list(request):
             "documents": documents,
             "organizations": Organization.objects.filter(is_active=True).order_by("name"),
             "selected_organization": organization_id,
+            "selected_document_type": document_type,
         },
     )
 
@@ -865,7 +906,7 @@ def historical_document_create(request):
         log_activity(request, "historical_document_uploaded", target=document)
         messages.success(
             request,
-            "El informe fue registrado. Ahora agregue sus recomendaciones pendientes.",
+            "El informe anterior fue registrado. Ahora agregue sus recomendaciones pendientes.",
         )
         return redirect("historical_document_detail", pk=document.pk)
     return render(request, "audits/historical_document_form.html", {"form": form})
